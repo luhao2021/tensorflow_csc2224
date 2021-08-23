@@ -35,11 +35,14 @@ namespace tensorflow {
 typedef std::complex<float> complex64;
 typedef std::complex<double> complex128;
 
+extern "C" uint32_t CastF32ToValue(const float f);
+extern "C" float CastValueToF32(const uint32_t u);
+
 struct cus {
   uint32_t value;
 
   CUSTOM_DEVICE_FUNC constexpr cus() : value(0) {}
-  CUSTOM_DEVICE_FUNC cus(const float& f) : value(castF32ToValue(f)) {}
+  CUSTOM_DEVICE_FUNC cus(const float& f) : value(CastF32ToValue(f)) {}
   CUSTOM_DEVICE_FUNC cus(const double& d) : cus(static_cast<float>(d)) {}
   explicit CUSTOM_DEVICE_FUNC cus(const complex64& c64)
       : cus(static_cast<float>(c64.real())) {}
@@ -50,32 +53,30 @@ struct cus {
   explicit CUSTOM_DEVICE_FUNC cus(const T& value)
       : cus(static_cast<float>(value)) {}
 
-  CUSTOM_DEVICE_FUNC operator float() const { return castValueToF32(value); }
+  CUSTOM_DEVICE_FUNC operator float() const { return CastValueToF32(value); }
 
   explicit CUSTOM_DEVICE_FUNC operator double() const {
     float f = static_cast<float>(*this);
     return static_cast<double>(f);
   }
-  static uint32_t castF32ToValue(const float& f);
-  static float castValueToF32(const uint32_t& u);
+
 };
 
 
-inline float CastCusToF32(cus c) { return (float)(c); }
-inline cus CastF32ToCus(const float f) { return cus(f); }
-cus CusAdd(cus a, cus b);
-cus CusSub(cus a, cus b);
-cus CusMul(cus a, cus b);
-cus CusDiv(cus a, cus b);
-cus CusNeg(cus a);
+extern "C" {
+cus CusAdd(const cus a, const cus b);
+cus CusSub(const cus a, const cus b);
+cus CusMul(const cus a, const cus b);
+cus CusDiv(const cus a, const cus b);
+cus CusNeg(const cus a);
+bool CusEq(const cus a, const cus b);
+bool CusNe(const cus a, const cus b);
+bool CusLt(const cus a, const cus b);
+bool CusLe(const cus a, const cus b);
+bool CusGt(const cus a, const cus b);
+bool CusGe(const cus a, const cus b);
 
-bool CusEq(cus a, cus b);
-bool CusNe(cus a, cus b);
-bool CusLt(cus a, cus b);
-bool CusLe(cus a, cus b);
-bool CusGt(cus a, cus b);
-bool CusGe(cus a, tensorflow::cus b);
-
+}
 
 inline CUSTOM_DEVICE_FUNC cus operator+(const cus& a, const cus& b){ return CusAdd(a,b);}
 inline CUSTOM_DEVICE_FUNC cus operator-(const cus& a){ return CusNeg(a);}

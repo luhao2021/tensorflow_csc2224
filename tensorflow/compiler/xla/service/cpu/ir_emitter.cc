@@ -1499,20 +1499,6 @@ static bool ReductionPreservesLayout(const HloInstruction& reduce) {
   return true;
 }
 
-llvm::Value* CreateCusAdd(llvm::IRBuilder<>* b, llvm::Value* lhs, llvm::Value* rhs) {
-  // llvm::StructType* cus = llvm_ir::getCusTy(module->getContext());
-  
-  // llvm::Value* func =
-  //     module->getOrInsertFunction("CastCusToF32", b->getFloatTy(), cus)
-  //         .getCallee();
-  // llvm::Function* cast_cus_to_f32 = llvm::dyn_cast<llvm::Function>(func);
-  // auto args = cast_cus_to_f32->arg_begin();
-  // llvm::Value* c = args++;
-  // c->setName("c");
-
-  // return b->CreateCall(cast_cus_to_f32, {cus_value});
-}
-
 IrEmitter::ReductionGenerator IrEmitter::MatchReductionGenerator(
     HloComputation* function, string* failure_reason) const {
   CHECK_EQ(function->num_parameters(), 2);

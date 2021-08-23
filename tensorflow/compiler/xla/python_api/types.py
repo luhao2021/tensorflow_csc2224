@@ -47,7 +47,6 @@ MAP_XLA_TYPE_TO_RECORD = {
             numpy_dtype=dtypes.bfloat16.as_numpy_dtype,
             literal_field_name='bf16s',
             literal_field_type=float),
-    # todo(chenhao) need to modify here when change cuswrappedtype 
     xla_data_pb2.CUS:
         TypeConversionRecord(
             primitive_type=xla_data_pb2.CUS,

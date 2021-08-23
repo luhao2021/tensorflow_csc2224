@@ -139,9 +139,8 @@ llvm::Value* EmitBufferIndexingGEP(llvm::Value* array, int64 index,
   return EmitBufferIndexingGEP(array, b->getInt64(index), b);
 }
 
-llvm::StructType* getCusTy(llvm::LLVMContext& context){
-  llvm::SmallVector<llvm::Type*, 1> structFields({llvm::Type::getInt32Ty(context)});
-  return llvm::StructType::get(context, structFields);
+llvm::Type* getCusTy(llvm::LLVMContext& context){
+  return llvm::Type::getInt32Ty(context);
 }
 
 llvm::Type* PrimitiveTypeToIrType(PrimitiveType element_type,

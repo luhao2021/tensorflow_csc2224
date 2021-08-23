@@ -45,6 +45,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/llvm_ir/loop_emitter.h"
 #include "tensorflow/compiler/xla/service/llvm_ir/tuple_ops.h"
 #include "tensorflow/compiler/xla/service/name_uniquer.h"
+#include "tensorflow/compiler/xla/service/cus_related_functions.h"
 #include "tensorflow/compiler/xla/shape_util.h"
 #include "tensorflow/compiler/xla/status_macros.h"
 #include "tensorflow/compiler/xla/types.h"
@@ -701,6 +702,9 @@ Status IrEmitter::HandleDot(HloInstruction* dot) {
   } else if (ShapeUtil::ElementIsFloating(lhs_shape)) {
     llvm::Value* product = FMul(lhs_element, rhs_element);
     updated_accum = FAdd(accum, product);
+  } else if (ShapeUtil::ElementIsCus(lhs_shape)){
+    llvm::Value* product = EmitCusMul(lhs_element, rhs_element, &b_);
+    updated_accum = EmitCusAdd(accum, product, &b_);
   } else {
     TF_RET_CHECK(ShapeUtil::ElementIsIntegral(lhs_shape));
     llvm::Value* product = Mul(lhs_element, rhs_element);

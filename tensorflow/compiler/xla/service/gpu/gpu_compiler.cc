@@ -29,6 +29,9 @@ limitations under the License.
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/IRReader/IRReader.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Linker/Linker.h"
 #include "mlir/IR/Module.h"  // from @llvm-project
 #include "mlir/InitAllDialects.h"  // from @llvm-project
 #include "tensorflow/compiler/xla/protobuf_util.h"
@@ -716,6 +719,10 @@ StatusOr<std::unique_ptr<Executable>> GpuCompiler::RunBackend(
   if (embed_ir_in_executable) {
     ir_module_string_before_opt = llvm_ir::DumpModuleToString(*llvm_module);
   }
+
+  llvm::SMDiagnostic diagnostic;
+  auto m = llvm::parseIRFile("tensorflow/core/platform/cus.bc", diagnostic, llvm_context);
+  llvm::Linker::linkModules(*llvm_module, std::move(m));
 
   llvm_ir::DumpIrIfEnabled(*module, *llvm_module, /*optimized=*/false);
 

@@ -20,40 +20,40 @@ limitations under the License.
 
 namespace tensorflow {
 
-uint32_t cus::castF32ToValue(const float& f){
+uint32_t CastF32ToValue(const float f){
   return  *(uint32_t*) &f;
 }
 
-float cus::castValueToF32(const uint32_t& u){
+float CastValueToF32(const uint32_t u){
   return *(float*)&u;
 }
 
-tensorflow::cus CusAdd(tensorflow::cus a, tensorflow::cus b) {
+
+cus CusAdd(const cus a, const cus b) {
   return cus(static_cast<float>(a) + static_cast<float>(b));
 }
 
-tensorflow::cus CusSub(tensorflow::cus a, tensorflow::cus b) {
+cus CusSub(const cus a, const cus b) {
   return cus(static_cast<float>(a) - static_cast<float>(b));
 }
 
-tensorflow::cus CusMul(tensorflow::cus a, tensorflow::cus b) {
+cus CusMul(const cus a, const cus b) {
   return cus(static_cast<float>(a) * static_cast<float>(b));
 }
 
-tensorflow::cus CusDiv(tensorflow::cus a, tensorflow::cus b) {
+cus CusDiv(const cus a, const cus b) {
   return cus(static_cast<float>(a) / static_cast<float>(b));
 }
 
-tensorflow::cus CusNeg(tensorflow::cus a) {
+cus CusNeg(const cus a) {
   return cus(-static_cast<float>(a));
 }
 
-bool CusEq(tensorflow::cus a, tensorflow::cus b) { return static_cast<float>(a) == static_cast<float>(b); }
-bool CusNe(tensorflow::cus a, tensorflow::cus b) { return static_cast<float>(a) != static_cast<float>(b); }
-bool CusLt(tensorflow::cus a, tensorflow::cus b) { return static_cast<float>(a) < static_cast<float>(b);}
-bool CusLe(tensorflow::cus a, tensorflow::cus b) { return static_cast<float>(a) <= static_cast<float>(b);}
-bool CusGt(tensorflow::cus a, tensorflow::cus b) { return static_cast<float>(a) > static_cast<float>(b);}
-bool CusGe(tensorflow::cus a, tensorflow::cus b) { return static_cast<float>(a) >= static_cast<float>(b); }
-
+bool CusEq(const cus a, const cus b) { return static_cast<float>(a) == static_cast<float>(b); }
+bool CusNe(const cus a, const cus b) { return static_cast<float>(a) != static_cast<float>(b); }
+bool CusLt(const cus a, const cus b) { return static_cast<float>(a) < static_cast<float>(b);}
+bool CusLe(const cus a, const cus b) { return static_cast<float>(a) <= static_cast<float>(b);}
+bool CusGt(const cus a, const cus b) { return static_cast<float>(a) > static_cast<float>(b);}
+bool CusGe(const cus a, const cus b) { return static_cast<float>(a) >= static_cast<float>(b); }
 
 }  // namespace tensorflow
