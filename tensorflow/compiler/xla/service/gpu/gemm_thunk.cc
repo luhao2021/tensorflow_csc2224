@@ -30,6 +30,9 @@ limitations under the License.
 #include "tensorflow/stream_executor/blas.h"
 #include "tensorflow/stream_executor/device_memory.h"
 
+#include "tensorflow/stream_executor/gpu/gpu_helpers.h"
+#include "third_party/gpus/cuda/include/cuda_runtime_api.h"
+
 namespace xla {
 namespace gpu {
 
@@ -110,6 +113,9 @@ static bool DoGemmWithAlgorithm(
     case C128:
       computation_type = se::blas::ComputationType::kComplexF64;
       break;
+    case CUS:
+      computation_type = se::blas::ComputationType::kCUS;
+      break;
     default:
       return false;
   }
@@ -140,7 +146,6 @@ static bool DoGemmWithAlgorithm(
             *algorithm, output_profile_result)
         .ok();
   }
-
   if (batch_size != 1) {
     int64 lhs_stride = lhs_matrix.num_rows * lhs_matrix.num_cols;
     int64 rhs_stride = rhs_matrix.num_rows * rhs_matrix.num_cols;
@@ -157,7 +162,6 @@ static bool DoGemmWithAlgorithm(
             batch_size)
         .ok();
   }
-
   return stream
       ->ThenBlasGemm(
           lhs_transpose, rhs_transpose, output_matrix.num_rows,
@@ -285,6 +289,12 @@ Status RunGemm(const GpuGemmConfig &gemm_config,
       case F32:
         CHECK_EQ(alpha.imag(), 0);
         return DoGemmWithAlgorithm<float, double>(
+            batch_size, lhs_matrix, rhs_matrix, output_matrix, alpha.real(),
+            beta, stream, best_algorithm,
+            /*output_profile_result=*/profile_result);
+      case CUS:
+        CHECK_EQ(alpha.imag(), 0);
+        return DoGemmWithAlgorithm<cus, double>(
             batch_size, lhs_matrix, rhs_matrix, output_matrix, alpha.real(),
             beta, stream, best_algorithm,
             /*output_profile_result=*/profile_result);

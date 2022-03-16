@@ -47,6 +47,8 @@ limitations under the License.
 #include "tensorflow/stream_executor/lib/array_slice.h"
 #include "tensorflow/stream_executor/lib/statusor.h"
 #include "tensorflow/stream_executor/platform/port.h"
+#include "tensorflow/core/platform/cus.h"
+using tensorflow::cus;
 
 namespace Eigen {
 struct half;
@@ -109,6 +111,7 @@ enum class ComputationType {
   // to a smaller number of bits.
   kTF32AsF32,  // 32-bit floating-point with reduced (>=10-bit) mantissa
   kBF16AsF32,  // 32-bit floating-point with reduced (7-bit) mantissa
+  kCUS,
 };
 
 enum class Epilogue {
@@ -1033,6 +1036,11 @@ class BlasSupport {
                           DeviceMemory<float> *c, int ldc) = 0;
   virtual bool DoBlasGemm(Stream *stream, blas::Transpose transa,
                           blas::Transpose transb, uint64 m, uint64 n, uint64 k,
+                          float alpha, const DeviceMemory<cus> &a, int lda,
+                          const DeviceMemory<cus> &b, int ldb, float beta,
+                          DeviceMemory<cus> *c, int ldc) = 0;
+  virtual bool DoBlasGemm(Stream *stream, blas::Transpose transa,
+                          blas::Transpose transb, uint64 m, uint64 n, uint64 k,
                           double alpha, const DeviceMemory<double> &a, int lda,
                           const DeviceMemory<double> &b, int ldb, double beta,
                           DeviceMemory<double> *c, int ldc) = 0;
@@ -1125,6 +1133,14 @@ class BlasSupport {
       ProfileResult *output_profile_result) = 0;
   virtual bool DoBlasGemmWithAlgorithm(
       Stream *stream, blas::Transpose transa, blas::Transpose transb, uint64 m,
+      uint64 n, uint64 k, const HostOrDeviceScalar<cus> &alpha,
+      const DeviceMemory<cus> &a, int lda,
+      const DeviceMemory<cus> &b, int ldb,
+      const HostOrDeviceScalar<cus> &beta, DeviceMemory<cus> *c,
+      int ldc, ComputationType computation_type, AlgorithmType algorithm,
+      ProfileResult *output_profile_result) = 0;
+  virtual bool DoBlasGemmWithAlgorithm(
+      Stream *stream, blas::Transpose transa, blas::Transpose transb, uint64 m,
       uint64 n, uint64 k, const HostOrDeviceScalar<double> &alpha,
       const DeviceMemory<double> &a, int lda, const DeviceMemory<double> &b,
       int ldb, const HostOrDeviceScalar<double> &beta, DeviceMemory<double> *c,
@@ -1203,6 +1219,12 @@ class BlasSupport {
       uint64 n, uint64 k, float alpha, const DeviceMemory<float> &a, int lda,
       int64 stride_a, const DeviceMemory<float> &b, int ldb, int64 stride_b,
       float beta, DeviceMemory<float> *c, int ldc, int64 stride_c,
+      int batch_count) = 0;
+  virtual bool DoBlasGemmStridedBatched(
+      Stream *stream, blas::Transpose transa, blas::Transpose transb, uint64 m,
+      uint64 n, uint64 k, float alpha, const DeviceMemory<cus> &a, int lda,
+      int64 stride_a, const DeviceMemory<cus> &b, int ldb, int64 stride_b,
+      float beta, DeviceMemory<cus> *c, int ldc, int64 stride_c,
       int batch_count) = 0;
   virtual bool DoBlasGemmStridedBatched(
       Stream *stream, blas::Transpose transa, blas::Transpose transb, uint64 m,
@@ -2017,6 +2039,11 @@ class BlasSupport {
                   DeviceMemory<float> *c, int ldc) override;                   \
   bool DoBlasGemm(Stream *stream, blas::Transpose transa,                      \
                   blas::Transpose transb, uint64 m, uint64 n, uint64 k,        \
+                  float alpha, const DeviceMemory<cus> &a, int lda,            \
+                  const DeviceMemory<cus> &b, int ldb, float beta,             \
+                  DeviceMemory<cus> *c, int ldc) override;                     \
+  bool DoBlasGemm(Stream *stream, blas::Transpose transa,                      \
+                  blas::Transpose transb, uint64 m, uint64 n, uint64 k,        \
                   double alpha, const DeviceMemory<double> &a, int lda,        \
                   const DeviceMemory<double> &b, int ldb, double beta,         \
                   DeviceMemory<double> *c, int ldc) override;                  \
@@ -2097,6 +2124,14 @@ class BlasSupport {
       blas::ProfileResult *output_profile_result) override;                    \
   bool DoBlasGemmWithAlgorithm(                                                \
       Stream *stream, blas::Transpose transa, blas::Transpose transb,          \
+      uint64 m, uint64 n, uint64 k, const HostOrDeviceScalar<cus> &alpha,      \
+      const DeviceMemory<cus> &a, int lda, const DeviceMemory<cus> &b,         \
+      int ldb, const HostOrDeviceScalar<cus> &beta,                            \
+      DeviceMemory<cus> *c, int ldc,                                           \
+      blas::ComputationType computation_type, blas::AlgorithmType algorithm,   \
+      blas::ProfileResult *output_profile_result) override;                    \                                         
+  bool DoBlasGemmWithAlgorithm(                                                \
+      Stream *stream, blas::Transpose transa, blas::Transpose transb,          \
       uint64 m, uint64 n, uint64 k, const HostOrDeviceScalar<double> &alpha,   \
       const DeviceMemory<double> &a, int lda, const DeviceMemory<double> &b,   \
       int ldb, const HostOrDeviceScalar<double> &beta,                         \
@@ -2172,6 +2207,12 @@ class BlasSupport {
       uint64 m, uint64 n, uint64 k, float alpha, const DeviceMemory<float> &a, \
       int lda, int64 stride_a, const DeviceMemory<float> &b, int ldb,          \
       int64 stride_b, float beta, DeviceMemory<float> *c, int ldc,             \
+      int64 stride_c, int batch_count);                                        \
+  bool DoBlasGemmStridedBatched(                                               \
+      Stream *stream, blas::Transpose transa, blas::Transpose transb,          \
+      uint64 m, uint64 n, uint64 k, float alpha, const DeviceMemory<cus> &a,   \
+      int lda, int64 stride_a, const DeviceMemory<cus> &b, int ldb,            \
+      int64 stride_b, float beta, DeviceMemory<cus> *c, int ldc,               \
       int64 stride_c, int batch_count);                                        \
   bool DoBlasGemmStridedBatched(                                               \
       Stream *stream, blas::Transpose transa, blas::Transpose transb,          \

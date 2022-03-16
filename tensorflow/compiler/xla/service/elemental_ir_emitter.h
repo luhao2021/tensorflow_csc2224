@@ -85,10 +85,6 @@ class ElementalIrEmitter : public IrBuilderMixin<ElementalIrEmitter> {
   llvm::Value* GetIntSMin(llvm::Type* type);
   llvm::Value* GetMinusOne(llvm::Type* type);
 
-//   llvm::Value* EmitCusAdd(llvm::Value* lhs, llvm::Value* rhs);
-//   llvm::Value* EmitCusSub(llvm::Value* lhs, llvm::Value* rhs);
-//   llvm::Value* EmitCusMul(llvm::Value* lhs, llvm::Value* rhs);
-//   llvm::Value* EmitCusDiv(llvm::Value* lhs, llvm::Value* rhs);
   llvm::Value* EmitIntegerDivide(llvm::Value* lhs, llvm::Value* rhs,
                                  bool is_signed);
   llvm::Value* EmitIntegerRemainder(llvm::Value* lhs, llvm::Value* rhs,

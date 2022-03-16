@@ -718,6 +718,9 @@ StatusOr<bool> BufferComparator::CompareEqual(se::Stream* stream,
     case xla::S8:
       return CompareEqualParameterized<int8, float>(
           stream, lhs, rhs, shape_, config_, "__xla_int8_comparison");
+    case xla::CUS:
+      return CompareEqualParameterized<cus, float>(
+          stream, lhs, rhs, shape_, config_, "__xla_int8_comparison");
     default:
       return Unimplemented("Unimplemented element type");
   }

@@ -164,6 +164,8 @@ Literal ConvertType(LiteralSlice literal) {
       return LiteralUtil::CreateR0<half>(static_cast<half>(0.0f));
     case BF16:
       return LiteralUtil::CreateR0<bfloat16>(static_cast<bfloat16>(0.0f));
+    case CUS:
+      return LiteralUtil::CreateR0<cus>(static_cast<cus>(0.0f));
     case F32:
       return LiteralUtil::CreateR0<float>(0);
     case F64:
@@ -260,6 +262,9 @@ Literal ConvertType(LiteralSlice literal) {
     case BF16:
       return LiteralUtil::CreateR0<bfloat16>(
           static_cast<bfloat16>(-std::numeric_limits<float>::infinity()));
+    case CUS:
+      return LiteralUtil::CreateR0<cus>(
+          static_cast<cus>(-std::numeric_limits<float>::infinity()));
     case TUPLE:
       LOG(FATAL) << "tuple element type has no minimum value";
     case OPAQUE_TYPE:

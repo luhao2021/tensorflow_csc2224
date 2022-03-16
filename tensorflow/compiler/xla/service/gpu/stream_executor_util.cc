@@ -247,6 +247,13 @@ typename std::enable_if<std::is_floating_point<T>::value,
   return std::uniform_real_distribution<T>(lhs, rhs)(*gen);
 }
 
+template <typename T, typename Generator>
+typename std::enable_if<
+    std::is_same<cus, typename std::remove_cv<T>::type>::value,
+    T>::type static UniformDistribution(T lhs, T rhs, Generator* gen) {
+  return cus(std::uniform_real_distribution<float>(lhs, rhs)(*gen));
+};
+
 template <typename T>
 static void InitializeTypedBuffer(se::Stream* stream,
                                   se::DeviceMemoryBase buffer,
@@ -314,6 +321,8 @@ void InitializeBuffer(se::Stream* stream, PrimitiveType buffer_type,
       return InitializeTypedBuffer<double>(stream, buffer, rng_state);
     case xla::S8:
       return InitializeTypedBuffer<int8>(stream, buffer, rng_state);
+    case xla::CUS:
+      return InitializeTypedBuffer<cus>(stream, buffer, rng_state);
     default:
       LOG(FATAL) << "Unexpected type";
   }

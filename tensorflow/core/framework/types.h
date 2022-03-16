@@ -482,10 +482,13 @@ inline bool DataTypeCanUseMemcpy(DataType dt) {
 
 // Returns true iff 'dt' is a real, non-quantized floating point type.
 constexpr DataTypeSet kDataTypeIsFloating =
-    ToSet(DT_HALF) | ToSet(DT_BFLOAT16) | ToSet(DT_CUS) | ToSet(DT_FLOAT) | ToSet(DT_DOUBLE);
+    ToSet(DT_HALF) | ToSet(DT_BFLOAT16) | ToSet(DT_FLOAT) | ToSet(DT_DOUBLE);
 inline bool DataTypeIsFloating(DataType dt) {
   return kDataTypeIsFloating.Contains(dt);
 }
+
+constexpr DataTypeSet kDataTypeIsCus = ToSet(DT_CUS);
+inline bool DataTypeIsCus(DataType dt) { return kDataTypeIsCus.Contains(dt); }
 
 // Returns true iff 'dt' is a complex type.
 constexpr DataTypeSet kDataTypeIsComplex =

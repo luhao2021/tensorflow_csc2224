@@ -663,7 +663,7 @@ def _get_cuda_config(repository_ctx, find_cuda_config_script):
           compute_capabilities: A list of the system's CUDA compute capabilities.
           cpu_value: The name of the host operating system.
       """
-    config = find_cuda_config(repository_ctx, find_cuda_config_script, ["cuda", "cudnn"])
+    config = find_cuda_config(repository_ctx, find_cuda_config_script, ["cuda", "cudnn", "cutlass"])
     cpu_value = get_cpu_value(repository_ctx)
     toolkit_path = config["cuda_toolkit_path"]
 
@@ -674,6 +674,8 @@ def _get_cuda_config(repository_ctx, find_cuda_config_script):
 
     cuda_version = ("64_%s%s" if is_windows else "%s.%s") % (cuda_major, cuda_minor)
     cudnn_version = ("64_%s" if is_windows else "%s") % config["cudnn_version"]
+    print(config)
+    cutlass_version = config["cutlass_version"]
 
     if int(cuda_major) >= 11:
         # The libcudart soname in CUDA 11.x is versioned as 11.0 for backward compatability.
@@ -710,6 +712,7 @@ def _get_cuda_config(repository_ctx, find_cuda_config_script):
         cuda_version_major = cuda_major,
         cudart_version = cudart_version,
         cublas_version = cublas_version,
+        cutlass_version = cutlass_version,
         cusolver_version = cusolver_version,
         curand_version = curand_version,
         cufft_version = cufft_version,
@@ -803,6 +806,7 @@ filegroup(name="cufft-include")
 filegroup(name="cusparse-include")
 filegroup(name="curand-include")
 filegroup(name="cudnn-include")
+filegroup(name="cutlass-include")
 """,
         },
     )
@@ -981,6 +985,7 @@ def _create_local_cuda_repository(repository_ctx):
     cudnn_header_dir = cuda_config.config["cudnn_include_dir"]
     cupti_header_dir = cuda_config.config["cupti_include_dir"]
     nvvm_libdevice_dir = cuda_config.config["nvvm_library_dir"]
+    cutlass_include_path = cuda_config.config["cutlass_include_dir"]
 
     # Create genrule to copy files from the installed CUDA toolkit into execroot.
     copy_rules = [
@@ -989,6 +994,12 @@ def _create_local_cuda_repository(repository_ctx):
             name = "cuda-include",
             src_dir = cuda_include_path,
             out_dir = "cuda/include",
+        ),
+        make_copy_dir_rule(
+            repository_ctx,
+            name = "cutlass-include",
+            src_dir = cutlass_include_path,
+            out_dir = "cutlass",
         ),
         make_copy_dir_rule(
             repository_ctx,

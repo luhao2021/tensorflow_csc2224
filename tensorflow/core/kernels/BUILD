@@ -1,5 +1,6 @@
 load("//tensorflow/core/platform:rules_cc.bzl", "cc_library")
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
+load("@local_config_cuda//cuda:build_defs.bzl", "cuda_library")
 load(
     "//tensorflow:tensorflow.bzl",
     "if_android",
@@ -294,6 +295,20 @@ cc_library(
         "concat_lib_cpu.h",
     ],
     deps = ["//third_party/eigen3"],
+)
+
+cuda_library(
+    name = "cutlass_gemm",
+    srcs = [
+        "cutlass_gemm.cu.cc",
+    ],
+    hdrs = ["cutlass_gemm.h"],
+    deps = [
+        "@local_config_cuda//cuda:cutlass_headers",
+        "//tensorflow/core/platform:cus",
+        "//tensorflow/core/platform:logging",
+    ],
+    alwayslink = 1,
 )
 
 tf_kernel_library(

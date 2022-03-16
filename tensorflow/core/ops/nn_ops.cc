@@ -336,7 +336,7 @@ REGISTER_OP("Conv2D")
     .Input("input: T")
     .Input("filter: T")
     .Output("output: T")
-    .Attr("T: {half, bfloat16, float, double, int32}")
+    .Attr("T: {half, bfloat16, cus, float, double, int32}")
     .Attr("strides: list(int)")
     .Attr("use_cudnn_on_gpu: bool = true")
     .Attr(GetPaddingAttrStringWithExplicit())
@@ -350,7 +350,7 @@ REGISTER_OP("Conv2DBackpropInput")
     .Input("filter: T")
     .Input("out_backprop: T")
     .Output("output: T")
-    .Attr("T: {half, bfloat16, float, double, int32}")
+    .Attr("T: {half, bfloat16, float, cus, double, int32}")
     .Attr("strides: list(int)")
     .Attr("use_cudnn_on_gpu: bool = true")
     .Attr(GetPaddingAttrStringWithExplicit())
@@ -367,7 +367,7 @@ REGISTER_OP("Conv2DBackpropFilter")
     .Input("filter_sizes: int32")
     .Input("out_backprop: T")
     .Output("output: T")
-    .Attr("T: {half, bfloat16, float, double}")
+    .Attr("T: {half, bfloat16, cus, float, double}")
     .Attr("strides: list(int)")
     .Attr("use_cudnn_on_gpu: bool = true")
     .Attr(GetPaddingAttrStringWithExplicit())
@@ -828,7 +828,7 @@ REGISTER_OP("LRNGrad")
 
 REGISTER_OP("MaxPool")
     .Attr(
-        "T: {half, bfloat16, float, double, int32, int64, uint8, int16, int8, "
+        "T: {half, bfloat16, cus, float, double, int32, int64, uint8, int16, int8, "
         "uint16, qint8} = DT_FLOAT")
     .Attr("ksize: list(int) >= 4")
     .Attr("strides: list(int) >= 4")
@@ -841,7 +841,7 @@ REGISTER_OP("MaxPool")
 
 REGISTER_OP("MaxPoolV2")
     .Attr(
-        "T: {half, bfloat16, float, double, int32, int64, uint8, int16, int8, "
+        "T: {half, bfloat16, cus, float, double, int32, int64, uint8, int16, int8, "
         "uint16, qint8} = DT_FLOAT")
     .Attr(GetPaddingAttrString())
     .Attr("data_format: {'NHWC', 'NCHW', 'NCHW_VECT_C'} = 'NHWC'")
@@ -1181,7 +1181,7 @@ REGISTER_OP("SoftsignGrad")
 REGISTER_OP("Softmax")
     .Input("logits: T")
     .Output("softmax: T")
-    .Attr("T: {half, bfloat16, float, double}")
+    .Attr("T: {half, bfloat16, cus, float, double}")
     .SetShapeFn([](InferenceContext* c) {
       return shape_inference::UnchangedShapeWithRankAtLeast(c, 1);
     });
@@ -1235,7 +1235,7 @@ REGISTER_OP("SparseSoftmaxCrossEntropyWithLogits")
     .Input("labels: Tlabels")
     .Output("loss: T")
     .Output("backprop: T")
-    .Attr("T: {half, bfloat16, float, double}")
+    .Attr("T: {half, bfloat16, cus, float, double}")
     .Attr("Tlabels: {int32, int64} = DT_INT64")
     .SetShapeFn([](InferenceContext* c) {
       ShapeHandle features;

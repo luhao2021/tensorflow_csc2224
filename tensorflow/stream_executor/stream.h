@@ -1282,6 +1282,11 @@ class Stream {
                                  const DeviceMemory<float> &b, int ldb,
                                  float beta, DeviceMemory<float> *c, int ldc);
   TF_EXPORT Stream &ThenBlasGemm(blas::Transpose transa, blas::Transpose transb,
+                                 uint64 m, uint64 n, uint64 k, float alpha,
+                                 const DeviceMemory<cus> &a, int lda,
+                                 const DeviceMemory<cus> &b, int ldb,
+                                 float beta, DeviceMemory<cus> *c, int ldc);  
+  TF_EXPORT Stream &ThenBlasGemm(blas::Transpose transa, blas::Transpose transb,
                                  uint64 m, uint64 n, uint64 k, double alpha,
                                  const DeviceMemory<double> &a, int lda,
                                  const DeviceMemory<double> &b, int ldb,
@@ -1370,6 +1375,14 @@ class Stream {
       blas::ProfileResult *output_profile_result);
   Stream &ThenBlasGemmWithAlgorithm(
       blas::Transpose transa, blas::Transpose transb, uint64 m, uint64 n,
+      uint64 k, const HostOrDeviceScalar<cus> &alpha,
+      const DeviceMemory<cus> &a, int lda, const DeviceMemory<cus> &b,
+      int ldb, const HostOrDeviceScalar<cus> &beta, DeviceMemory<cus> *c,
+      int ldc, blas::ComputationType computation_type,
+      blas::AlgorithmType algorithm,
+      blas::ProfileResult *output_profile_result);
+  Stream &ThenBlasGemmWithAlgorithm(
+      blas::Transpose transa, blas::Transpose transb, uint64 m, uint64 n,
       uint64 k, const HostOrDeviceScalar<double> &alpha,
       const DeviceMemory<double> &a, int lda, const DeviceMemory<double> &b,
       int ldb, const HostOrDeviceScalar<double> &beta, DeviceMemory<double> *c,
@@ -1450,6 +1463,12 @@ class Stream {
       int batch_count, ScratchAllocator *scratch_allocator);
   Stream &ThenBlasGemmBatchedWithScratch(
       blas::Transpose transa, blas::Transpose transb, uint64 m, uint64 n,
+      uint64 k, cus alpha, const port::ArraySlice<DeviceMemory<cus> *> &a,
+      int lda, const port::ArraySlice<DeviceMemory<cus> *> &b, int ldb,
+      cus beta, const port::ArraySlice<DeviceMemory<cus> *> &c, int ldc,
+      int batch_count, ScratchAllocator *scratch_allocator);
+  Stream &ThenBlasGemmBatchedWithScratch(
+      blas::Transpose transa, blas::Transpose transb, uint64 m, uint64 n,
       uint64 k, double alpha, const port::ArraySlice<DeviceMemory<double> *> &a,
       int lda, const port::ArraySlice<DeviceMemory<double> *> &b, int ldb,
       double beta, const port::ArraySlice<DeviceMemory<double> *> &c, int ldc,
@@ -1482,6 +1501,11 @@ class Stream {
       int64 stride_a, const DeviceMemory<float> &b, int ldb, int64 stride_b,
       float beta, DeviceMemory<float> *c, int ldc, int64 stride_c,
       int batch_count);
+  Stream &ThenBlasGemmStridedBatched(
+      blas::Transpose transa, blas::Transpose transb, uint64 m, uint64 n,
+      uint64 k, float alpha, const DeviceMemory<cus>& a, int lda, int64 stride_a,
+      const DeviceMemory<cus>& b, int ldb, int64 stride_b, float beta,
+      DeviceMemory<cus>* c, int ldc, int64 stride_c, int batch_count);
   Stream &ThenBlasGemmStridedBatched(
       blas::Transpose transa, blas::Transpose transb, uint64 m, uint64 n,
       uint64 k, double alpha, const DeviceMemory<double> &a, int lda,

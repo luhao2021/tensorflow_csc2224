@@ -97,6 +97,17 @@ bool IsNonFloatingConv2D(const utils::MutableNodeView& node) {
   return false;
 }
 
+bool IsNonFloatingNorCusConv2D(const utils::MutableNodeView& node) {
+  if (IsConv2D(*node.node()) || IsConv2DBackpropInput(*node.node())) {
+    const auto* attr = node.GetAttr(kAttrT);
+    if (attr != nullptr) {
+      return !kDataTypeIsFloating.Contains(attr->type()) && !DataTypeIsCus(attr->type());
+    }
+  }
+  return false;
+}
+
+
 // Utils for layout agnostic transposer.
 
 bool IsComparisonOp(const NodeDef& node) {
@@ -278,7 +289,7 @@ bool Transposer::ShouldProcess(const TransposeContext& context,
                                  AttrDataFormatMatch(node, context.src_format);
 
   // Only transposes floating point nodes.
-  const bool is_integer_conv2d = IsNonFloatingConv2D(node);
+  const bool is_integer_conv2d = IsNonFloatingNorCusConv2D(node);
 
   return is_on_target_device && data_format_match && !is_integer_conv2d &&
          !context.nodes_to_preserve.contains(node_def->name()) &&

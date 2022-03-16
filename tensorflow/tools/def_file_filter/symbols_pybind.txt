@@ -65,6 +65,7 @@ tensorflow::BaseType
 tensorflow::DataTypeString
 tensorflow::DataTypeIsComplex
 tensorflow::DataTypeIsFloating
+tensorflow::DataTypeIsCus
 tensorflow::DataTypeIsInteger
 tensorflow::DataTypeIsQuantized
 tensorflow::DataTypeIsUnsigned

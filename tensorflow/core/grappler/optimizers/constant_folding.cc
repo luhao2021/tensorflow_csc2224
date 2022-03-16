@@ -2962,7 +2962,7 @@ Status ConstantFolding::SimplifyArithmeticOperations(
     if (y_matches_output_shape && is_any_div && x_is_one) {
       TF_RETURN_IF_ERROR(CheckAttrExists(*node, "T"));
       DataType type = node->attr().at("T").type();
-      if (DataTypeIsFloating(type) || DataTypeIsComplex(type)) {
+      if (DataTypeIsFloating(type) || DataTypeIsCus(type) || DataTypeIsComplex(type)) {
         ReplaceDivisionOfOnesByReciprocal(node, optimized_graph);
         return Status::OK();
       }
@@ -3051,7 +3051,7 @@ bool ConstantFolding::ReduceDivToReciprocalMul(GraphDef* optimized_graph,
     DataType type = node->attr().at("T").type();
     // Skip integer division.
     if (IsDiv(*node) &&
-        !(DataTypeIsFloating(type) || DataTypeIsComplex(type))) {
+        !(DataTypeIsFloating(type) || DataTypeIsCus(type) || DataTypeIsComplex(type))) {
       return false;
     }
     // Insert new reciprocal op and change node from Div to Mul.
@@ -3325,7 +3325,7 @@ bool ConstantFolding::ConstantPushDown(GraphProperties* properties,
   if (!CheckAttrExists(*node, "T").ok()) return false;
   DataType dtype = node->attr().at("T").type();
   if (!(is_symmetric && is_child_symmetric) &&
-      !(DataTypeIsFloating(dtype) || DataTypeIsComplex(dtype))) {
+      !(DataTypeIsFloating(dtype) || DataTypeIsCus(dtype) || DataTypeIsComplex(dtype))) {
     return false;
   }
 

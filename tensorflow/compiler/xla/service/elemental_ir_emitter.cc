@@ -443,7 +443,6 @@ StatusOr<llvm::Value*> ElementalIrEmitter::EmitCusUnaryOp(
       }
       if (primitive_util::BitWidth(from_type) ==
           primitive_util::BitWidth(to_type)) {
-        // todo(chenhao) not sure if bitcast works here
         return BitCast(operand_value,
                        llvm_ir::PrimitiveTypeToIrType(to_type, module_));
       }
@@ -454,75 +453,44 @@ StatusOr<llvm::Value*> ElementalIrEmitter::EmitCusUnaryOp(
           primitive_util::BitWidth(from_type),
           primitive_util::BitWidth(to_type));
     }
-    // case HloOpcode::kExp:
-    //   return EmitExp(op->shape().element_type(), operand_value);
-    // case HloOpcode::kExpm1:
-    //   return EmitExpm1(op->shape().element_type(), operand_value);
-    // case HloOpcode::kLog:
-    //   return EmitLog(op->shape().element_type(), operand_value);
-    // case HloOpcode::kLog1p:
-    //   return EmitLog1p(op->shape().element_type(), operand_value);
-    // case HloOpcode::kCos:
-    //   return EmitCos(op->shape().element_type(), operand_value);
-    // case HloOpcode::kSin:
-    //   return EmitSin(op->shape().element_type(), operand_value);
-    // case HloOpcode::kTanh:
-    //   return EmitTanh(op->shape().element_type(), operand_value);
-    // case HloOpcode::kSqrt:
-    //   return EmitSqrt(op->shape().element_type(), operand_value);
-    // case HloOpcode::kRsqrt:
-    //   return EmitRsqrt(op->shape().element_type(), operand_value);
-    // case HloOpcode::kCbrt:
-    //   return EmitCbrt(op->shape().element_type(), operand_value);
-    // case HloOpcode::kFloor:
-    //   return llvm_ir::EmitCallToIntrinsic(llvm::Intrinsic::floor,
-    //                                       {operand_value},
-    //                                       {operand_value->getType()}, b_);
-    // case HloOpcode::kCeil:
-    //   return llvm_ir::EmitCallToIntrinsic(llvm::Intrinsic::ceil,
-    //                                       {operand_value},
-    //                                       {operand_value->getType()}, b_);
-    // case HloOpcode::kAbs:
-    //   auto cus_zero = 
-    //   auto type =
-    //       llvm_ir::PrimitiveTypeToIrType(op->shape().element_type(),
-    //       module_);
-    //   auto cmp = ICmpSGE(operand_value, GetZero(type));
-    //   return Select(cmp, operand_value, Neg(operand_value));
-
-    // case HloOpcode::kRoundNearestAfz:
-    //   return llvm_ir::EmitCallToIntrinsic(llvm::Intrinsic::round,
-    //                                       {operand_value},
-    //                                       {operand_value->getType()}, b_);
-    // case HloOpcode::kSign: {
-    //   auto type = operand_value->getType();
-    //   auto zero = llvm::ConstantFP::get(type, 0.0);
-    //   auto ne0_i1 = FCmpONE(operand_value, zero);
-    //   auto ne0_float = UIToFP(ne0_i1, type);
-    //   llvm::Value* result = llvm_ir::EmitCallToIntrinsic(
-    //       llvm::Intrinsic::copysign, {ne0_float, operand_value},
-    //       {operand_value->getType()}, b_);
-    //   auto is_nan = FCmpUNO(operand_value, operand_value);
-    //   result = Select(is_nan, operand_value, result);
-    //   return result;
-    // }
-    // case HloOpcode::kIsFinite: {
-    //   // abs(x) o!= inf, this works because the comparison returns false if
-    //   // either operand is NaN.
-    //   auto type = operand_value->getType();
-    //   auto abs_value = llvm_ir::EmitCallToIntrinsic(
-    //       llvm::Intrinsic::fabs, {operand_value}, {type}, b_);
-    //   auto infinity = llvm::ConstantFP::getInfinity(type);
-    //   auto not_infinite = FCmpONE(abs_value, infinity);
-    //   return b_->CreateZExt(not_infinite,
-    //                         llvm_ir::PrimitiveTypeToIrType(PRED, module_));
-    // }
+    case HloOpcode::kExp:
+      return EmitCusExp(operand_value, b_);
+    case HloOpcode::kExpm1:
+      return EmitCusExpm1(operand_value, b_);
+    case HloOpcode::kLog:
+      return EmitCusLog(operand_value, b_);
+    case HloOpcode::kLog1p:
+      return EmitCusLog1p(operand_value, b_);
+    case HloOpcode::kCos:
+      return EmitCusCos(operand_value, b_);
+    case HloOpcode::kSin:
+      return EmitCusSin(operand_value, b_);
+    case HloOpcode::kTanh:
+      return EmitCusTanh(operand_value, b_);
+    case HloOpcode::kSqrt:
+      return EmitCusSqrt(operand_value, b_);
+    case HloOpcode::kRsqrt:
+      return EmitCusRsqrt(operand_value, b_);
+    case HloOpcode::kCbrt:
+      return EmitCusCbrt(operand_value, b_);
+    case HloOpcode::kFloor:
+      return EmitCusFloor(operand_value, b_);
+    case HloOpcode::kCeil:
+      return EmitCusCeil(operand_value, b_);
+    case HloOpcode::kAbs:
+      return EmitCusAbs(operand_value, b_);
+    case HloOpcode::kRoundNearestAfz:
+      return EmitCusRoundNearestAfz(operand_value, b_);
+    case HloOpcode::kSign:
+      return EmitCusSign(operand_value, b_);
+    case HloOpcode::kIsFinite:
+      return EmitCusIsFinite(operand_value, b_);
     case HloOpcode::kNegate:
       return EmitCusNeg(operand_value, b_);
-    // case HloOpcode::kReal:
-    //   return operand_value;
-    // case HloOpcode::kImag:
-    //   return llvm::ConstantFP::get(operand_value->getType(), 0.0);
+    case HloOpcode::kReal:
+      return operand_value;
+    case HloOpcode::kImag:
+      return llvm::ConstantFP::get(operand_value->getType(), 0.0);
     default:
       return Unimplemented("unary cus op '%s'", HloOpcodeString(op->opcode()));
   }
@@ -1010,6 +978,7 @@ StatusOr<llvm::Value*> ElementalIrEmitter::EmitCusBinaryOp(
     //   return FRem(lhs_value, rhs_value);
     case HloOpcode::kCompare: {
       switch (op->comparison_direction()) {
+        // todo(chenhao) need to extend result to i8 for nvptx
         case ComparisonDirection::kEq:
           return EmitCusEq(lhs_value, rhs_value, b_);
         case ComparisonDirection::kNe:
@@ -1025,13 +994,13 @@ StatusOr<llvm::Value*> ElementalIrEmitter::EmitCusBinaryOp(
       }
     }
     case HloOpcode::kMaximum:
-      return EmitFloatMax(lhs_value, rhs_value);
-    // case HloOpcode::kMinimum:
-    //   return EmitFloatMin(lhs_value, rhs_value);
-    // case HloOpcode::kPower:
-    //   return EmitPow(op->shape().element_type(), lhs_value, rhs_value);
-    // case HloOpcode::kAtan2:
-    //   return EmitAtan2(op->shape().element_type(), lhs_value, rhs_value);
+      return EmitCusMax(lhs_value, rhs_value, b_);
+    case HloOpcode::kMinimum:
+      return EmitCusMin(lhs_value, rhs_value, b_);
+    case HloOpcode::kPower:
+      return EmitCusPow(lhs_value, rhs_value, b_);
+    case HloOpcode::kAtan2:
+      return EmitCusAtan2(lhs_value, rhs_value, b_);
     default:
       return Unimplemented("binary floating point op '%s'",
                            HloOpcodeString(op->opcode()));

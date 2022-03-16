@@ -58,7 +58,7 @@ bool AreValidGemmShapes(const Shape& lhs_shape, const Shape& rhs_shape,
   bool type_is_allowed =
       (output_primitive_type == F16 || output_primitive_type == F32 ||
        output_primitive_type == F64 || output_primitive_type == C64 ||
-       output_primitive_type == C128);
+       output_primitive_type == C128  || output_primitive_type == CUS);
   return type_is_allowed && IsRank2(lhs_shape, batch_dimensions_size) &&
          IsRank2(rhs_shape, batch_dimensions_size) &&
          IsRank2(output_shape, batch_dimensions_size) &&

@@ -86,6 +86,8 @@ std::string ComputationTypeString(ComputationType ty) {
       return "complex f32";
     case ComputationType::kComplexF64:
       return "complex f64";
+    case ComputationType::kCUS:
+      return "cus";
     default:
       LOG(FATAL) << "Unknown ComputationType " << static_cast<int32>(ty);
   }

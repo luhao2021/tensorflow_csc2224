@@ -146,7 +146,7 @@ void MergeOutgoingDataEdges(const Scope& s, Node* old_node, Node* new_node,
       }
 
       if (debugging_opts.check_output_numerics &&
-          DataTypeIsFloating(new_output.type())) {
+          (DataTypeIsFloating(new_output.type()) || DataTypeIsCus(new_output.type()))) {
         ops::CheckNumerics check_numerics_op(
             s.WithOpName("check_output_", oidx)
                 .WithDevice(new_node->requested_device())
@@ -382,7 +382,7 @@ std::vector<Output> GetXlaRunArgs(const Scope& s,
                        cluster_info.resource_inputs.size());
   int input_idx = 0;
   for (const Output& o : cluster_info.non_constant_inputs) {
-    if (debugging_opts.check_input_numerics && DataTypeIsFloating(o.type())) {
+    if (debugging_opts.check_input_numerics && (DataTypeIsFloating(o.type()) || DataTypeIsCus(o.type()))) {
       ops::CheckNumerics check_numerics_op(
           s.WithOpName("check_input_", input_idx), o,
           absl::StrCat("CheckNumerics failed for input ", input_idx, "(",

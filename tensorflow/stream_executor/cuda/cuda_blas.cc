@@ -51,6 +51,7 @@ limitations under the License.
 #include "absl/strings/str_format.h"
 #include "third_party/eigen3/Eigen/Core"
 #include "tensorflow/core/platform/tensor_float_32_utils.h"
+#include "tensorflow/core/kernels/cutlass_gemm.h"
 #include "tensorflow/core/util/env_var.h"
 #include "tensorflow/stream_executor/cuda/cuda_activation.h"
 #include "tensorflow/stream_executor/cuda/cuda_gpu_executor.h"
@@ -68,6 +69,8 @@ limitations under the License.
 #include "tensorflow/stream_executor/plugin_registry.h"
 #include "tensorflow/stream_executor/scratch_allocator.h"
 #include "tensorflow/stream_executor/stream_executor.h"
+
+#include "third_party/gpus/cuda/include/cuda_runtime_api.h"
 
 namespace stream_executor {
 namespace gpu {
@@ -1847,6 +1850,34 @@ bool CUDABlas::DoBlasGemm(Stream *stream, blas::Transpose transa,
       GpuMemory(b), ldb, &beta, GpuMemoryMutable(c), ldc);
 }
 
+bool CUDABlas::DoBlasGemm(Stream* stream, blas::Transpose transa,
+                          blas::Transpose transb, uint64 m, uint64 n, uint64 k,
+                          float alpha, const DeviceMemory<cus>& a, int lda,
+                          const DeviceMemory<cus>& b, int ldb, float beta,
+                          DeviceMemory<cus>* c, int ldc) {
+  VLOG(1) << absl::StrFormat(
+      "doing cuBLAS SGEMM: at=%d bt=%d m=%u n=%u "
+      "k=%u alpha=%f a=%p lda=%d b=%p ldb=%d beta=%f "
+      "c=%p ldc=%d",
+      static_cast<int>(transa), static_cast<int>(transb), m, n, k, alpha,
+      a.opaque(), lda, b.opaque(), ldb, beta, c->opaque(), ldc);
+  absl::MutexLock lock(&mu_);
+  if (!SetStream(stream)) {
+    return false;
+  }
+  gpu::ScopedActivateExecutorContext sac{parent_};
+
+  cudaError_t ret = cutlassCusGemm(
+      AsGpuStreamValue(stream), static_cast<bool>(transa),
+      static_cast<bool>(transb), m, n, k, cus(alpha), GpuMemory(a), lda,
+      GpuMemory(b), ldb, cus(beta), GpuMemoryMutable(c), ldc);
+
+  if (ret != cudaSuccess) {
+    LOG(ERROR) << "failed to run cutlass routine: ";
+  }
+  return ret == cudaSuccess;
+}
+
 bool CUDABlas::DoBlasGemm(Stream *stream, blas::Transpose transa,
                           blas::Transpose transb, uint64 m, uint64 n, uint64 k,
                           double alpha, const DeviceMemory<double> &a, int lda,
@@ -2303,6 +2334,97 @@ bool CUDABlas::DoBlasGemmWithAlgorithm(
 
 bool CUDABlas::DoBlasGemmWithAlgorithm(
     Stream *stream, blas::Transpose transa, blas::Transpose transb, uint64 m,
+    uint64 n, uint64 k, const HostOrDeviceScalar<cus> &alpha,
+    const DeviceMemory<cus> &a, int lda, const DeviceMemory<cus> &b,
+    int ldb, const HostOrDeviceScalar<cus> &beta, DeviceMemory<cus> *c,
+    int ldc, blas::ComputationType computation_type,
+    blas::AlgorithmType algorithm, blas::ProfileResult *output_profile_result) {
+  // GPUs < sm_50 don't support cublasGemmEx.
+  int cc_major, cc_minor;
+  if (stream->parent()->GetDeviceDescription().cuda_compute_capability(
+          &cc_major, &cc_minor) &&
+      cc_major < 5) {
+    VLOG(2) << "DoBlasGemmWithAlgorithm returning false because sm" << cc_major
+            << cc_minor << " devices don't support explicit gemm algorithms.";
+    return false;
+  }
+
+  bool algo_uses_tensor_ops = UsesTensorOps(algorithm);
+  cublasMath_t math_type = CUBLAS_DEFAULT_MATH;
+  if (algo_uses_tensor_ops) {
+    if (cc_major < 7) {
+      VLOG(2) << "DoBlasGemmWithAlgorithm returning false because algorithm "
+              << algorithm
+              << " uses tensor ops, but tensor ops are not available in sm"
+              << cc_major << "X devices.";
+      return false;
+    } else {
+      VLOG(2) << "DoBlasGemmWithAlgorithm returning false because algorithm "
+              << algorithm
+              << " uses tensor ops, which are not supported for InT.";
+      return false;
+    }
+  }
+
+  // Either both 'alpha' and 'beta' need to be pointers to device memory, or
+  // they need to be both host scalars.
+  if (alpha.is_pointer() != beta.is_pointer()) {
+    VLOG(2) << "DoBlasGemmWithAlgorithm returning false because one of `alpha` "
+               "and `beta` is a pointer, but the other is not.";
+    return false;
+  }
+
+  std::unique_ptr<GpuTimer, GpuTimerDeleter> timer;
+  if (output_profile_result != nullptr) {
+    timer.reset(new GpuTimer(parent_));
+    if (!timer->Init() || !timer->Start(AsGpuStream(stream))) {
+      VLOG(2) << "DoBlasGemmWithAlgorithm returning false because "
+                 "output_profile_result was given, but we were unable to "
+                 "create a GpuTimer.";
+      return false;
+    }
+  }
+
+  // Since we are converting 'algorithm' to cublasGemmAlgo_t by static_cast,
+  // we do the following compile-time check on the default value:
+  static_assert(blas::kDefaultGemmAlgo == CUBLAS_GEMM_DFALT, "");
+  // If 'alpha' and 'beta' are host scalars and CompT is Eigen::half, we
+  // essentially reinterpet_cast to __half, which is safe because Eigen::half
+  // inherits from __half.
+
+  absl::MutexLock lock(&mu_);
+  if (!SetStream(stream)) {
+    return false;
+  }
+  gpu::ScopedActivateExecutorContext sac{parent_};
+  cudaError_t ret = cutlassCusGemm(
+      AsGpuStreamValue(stream), static_cast<bool>(transa),
+      static_cast<bool>(transb), m, n, k, alpha.value(), GpuMemory(a), lda,
+      GpuMemory(b), ldb, beta.value(), GpuMemoryMutable(c), ldc);
+
+  if (ret != cudaSuccess) {
+    LOG(ERROR) << "failed to run cutlass routine: ";
+  }
+  bool result = ret == cudaSuccess;
+
+  if (timer != nullptr && result) {
+    // GpuTimer will CHECK-fail if we Stop() it while the stream is in an error
+    // state.
+    if (!timer->Stop(AsGpuStream(stream))) {
+      VLOG(2) << "DoBlasGemmWithAlgorithm returning false; unable to stop "
+                 "GpuTimer.";
+      return false;
+    }
+    output_profile_result->set_is_valid(true);
+    output_profile_result->set_algorithm(algorithm);
+    output_profile_result->set_elapsed_time_in_ms(
+        timer->GetElapsedMilliseconds());
+  }
+  return result;
+}
+
+bool CUDABlas::DoBlasGemmWithAlgorithm(
+    Stream *stream, blas::Transpose transa, blas::Transpose transb, uint64 m,
     uint64 n, uint64 k, const HostOrDeviceScalar<double> &alpha,
     const DeviceMemory<double> &a, int lda, const DeviceMemory<double> &b,
     int ldb, const HostOrDeviceScalar<double> &beta, DeviceMemory<double> *c,
@@ -2669,6 +2791,29 @@ bool CUDABlas::DoBlasGemmStridedBatched(
       batch_count);
 }
 
+bool CUDABlas::DoBlasGemmStridedBatched(
+    Stream *stream, blas::Transpose transa, blas::Transpose transb, uint64 m,
+    uint64 n, uint64 k, float alpha, const DeviceMemory<cus> &a, int lda,
+    int64 stride_a, const DeviceMemory<cus> &b, int ldb, int64 stride_b,
+    float beta, DeviceMemory<cus> *c, int ldc, int64 stride_c,
+    int batch_count) {
+  // todo(chenhao) add batch part
+  absl::MutexLock lock(&mu_);
+  if (!SetStream(stream)) {
+    return false;
+  }
+  gpu::ScopedActivateExecutorContext sac{parent_};
+  cudaError_t ret = cutlassCusGemm(
+      AsGpuStreamValue(stream), static_cast<bool>(transa),
+      static_cast<bool>(transb), m, n, k, cus(alpha), GpuMemory(a), lda,
+      GpuMemory(b), ldb, cus(beta), GpuMemoryMutable(c), ldc);
+
+  if (ret != cudaSuccess) {
+    LOG(ERROR) << "failed to run cutlass routine: ";
+  }
+  return ret == cudaSuccess;
+}
+ 
 bool CUDABlas::DoBlasGemmStridedBatched(
     Stream *stream, blas::Transpose transa, blas::Transpose transb, uint64 m,
     uint64 n, uint64 k, double alpha, const DeviceMemory<double> &a, int lda,

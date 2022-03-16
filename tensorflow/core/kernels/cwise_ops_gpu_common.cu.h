@@ -178,7 +178,9 @@ struct ApproximateEqual<GPUDevice, T> {
 #define DEFINE_BINARY11(F, T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10) \
   DEFINE_BINARY5(F, T0, T1, T2, T3, T4);                                \
   DEFINE_BINARY6(F, T5, T6, T7, T8, T9, T10)
-
+#define DEFINE_BINARY12(F, T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11) \
+  DEFINE_BINARY6(F, T0, T1, T2, T3, T4, T5);                                 \
+  DEFINE_BINARY6(F, T6, T7, T8, T9, T10, T11)
 #define DEFINE_APPROXIMATE_EQUAL1(T) \
   template struct ApproximateEqual<GPUDevice, T>;
 #define DEFINE_APPROXIMATE_EQUAL2(T0, T1) \

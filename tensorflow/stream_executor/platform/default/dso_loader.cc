@@ -33,6 +33,7 @@ namespace {
 string GetCudaVersion() { return TF_CUDA_VERSION; }
 string GetCudaRtVersion() { return TF_CUDART_VERSION; }
 string GetCudnnVersion() { return TF_CUDNN_VERSION; }
+string GetCutlassVersion() { return "2.6"; } // todo(chenhao): change it to read from build
 string GetCublasVersion() { return TF_CUBLAS_VERSION; }
 string GetCusolverVersion() { return TF_CUSOLVER_VERSION; }
 string GetCurandVersion() { return TF_CURAND_VERSION; }
@@ -87,6 +88,10 @@ port::StatusOr<void*> GetCublasDsoHandle() {
 
 port::StatusOr<void*> GetCublasLtDsoHandle() {
   return GetDsoHandle("cublasLt", GetCublasVersion());
+}
+
+port::StatusOr<void*> GetCutlassDsoHandle() {
+  return GetDsoHandle("cutlass", GetCutlassVersion());
 }
 
 port::StatusOr<void*> GetCufftDsoHandle() {
@@ -167,6 +172,11 @@ port::StatusOr<void*> GetCublasDsoHandle() {
 
 port::StatusOr<void*> GetCublasLtDsoHandle() {
   static auto result = new auto(DsoLoader::GetCublasLtDsoHandle());
+  return *result;
+}
+
+port::StatusOr<void*> GetCutlassDsoHandle() {
+  static auto result = new auto(DsoLoader::GetCutlassDsoHandle());
   return *result;
 }
 

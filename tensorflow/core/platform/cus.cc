@@ -15,45 +15,25 @@ limitations under the License.
 
 #include "tensorflow/core/platform/cus.h"
 
-#include <complex>
-#include <cstring>
-
 namespace tensorflow {
 
-uint32_t CastF32ToValue(const float f){
-  return  *(uint32_t*) &f;
-}
+#define ForceCompile(func) \
+  void* ForceCompile##func() { return (void*)func; }
 
-float CastValueToF32(const uint32_t u){
-  return *(float*)&u;
-}
+ForceCompile(CastF32ToValue);
+ForceCompile(CastValueToF32);
+ForceCompile(CusAdd);
+ForceCompile(CusSub);
+ForceCompile(CusMul);
+ForceCompile(CusDiv);
+ForceCompile(CusNeg);
+ForceCompile(CusMax);
 
-
-cus CusAdd(const cus a, const cus b) {
-  return cus(static_cast<float>(a) + static_cast<float>(b));
-}
-
-cus CusSub(const cus a, const cus b) {
-  return cus(static_cast<float>(a) - static_cast<float>(b));
-}
-
-cus CusMul(const cus a, const cus b) {
-  return cus(static_cast<float>(a) * static_cast<float>(b));
-}
-
-cus CusDiv(const cus a, const cus b) {
-  return cus(static_cast<float>(a) / static_cast<float>(b));
-}
-
-cus CusNeg(const cus a) {
-  return cus(-static_cast<float>(a));
-}
-
-bool CusEq(const cus a, const cus b) { return static_cast<float>(a) == static_cast<float>(b); }
-bool CusNe(const cus a, const cus b) { return static_cast<float>(a) != static_cast<float>(b); }
-bool CusLt(const cus a, const cus b) { return static_cast<float>(a) < static_cast<float>(b);}
-bool CusLe(const cus a, const cus b) { return static_cast<float>(a) <= static_cast<float>(b);}
-bool CusGt(const cus a, const cus b) { return static_cast<float>(a) > static_cast<float>(b);}
-bool CusGe(const cus a, const cus b) { return static_cast<float>(a) >= static_cast<float>(b); }
+ForceCompile(CusEq);
+ForceCompile(CusNe);
+ForceCompile(CusLt);
+ForceCompile(CusLe);
+ForceCompile(CusGt);
+ForceCompile(CusGe);
 
 }  // namespace tensorflow

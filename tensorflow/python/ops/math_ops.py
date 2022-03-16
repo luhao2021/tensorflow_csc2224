@@ -1223,6 +1223,7 @@ _TRUEDIV_TABLE = {
     dtypes.int32: dtypes.float64,
     dtypes.int64: dtypes.float64,
     dtypes.bfloat16: None,
+    dtypes.cus: None,
     dtypes.float16: None,
     dtypes.float32: None,
     dtypes.float64: None,
@@ -3974,13 +3975,13 @@ def conj(x, name=None):
   """
   if isinstance(x, ops.Tensor):
     dt = x.dtype
-    if dt.is_floating or dt.is_integer:
+    if dt.is_floating or dt.is_cus or dt.is_integer:
       return x
   with ops.name_scope(name, "Conj", [x]) as name:
     x = ops.convert_to_tensor(x, name="x")
     if x.dtype.is_complex or x.dtype == dtypes.variant:
       return gen_math_ops.conj(x, name=name)
-    elif x.dtype.is_floating or x.dtype.is_integer:
+    elif x.dtype.is_floating or x.dtype.is_cus or x.dtype.is_integer:
       return x
     else:
       raise TypeError("Expected numeric or variant tensor, got dtype %r" %

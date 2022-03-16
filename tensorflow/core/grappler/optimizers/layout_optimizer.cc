@@ -1101,8 +1101,8 @@ class Conv2DProcessor : public NodeProcessor {
   bool ShouldProcess() const override {
     return !MustPreserve() && IsNHWC() && IsPortZeroDimsFour(*node_) &&
            HasOutputs() && (!IsGemmUsed() || no_gemm_) && IsOnGPU() &&
-           IsDataTypeFloat();
-  }
+           (IsDataTypeFloat() || IsDataTypeCus());
+  } 
 
   TensorShapeProto GetShape(const string& input_name) const {
     string node_name;
@@ -1135,6 +1135,13 @@ class Conv2DProcessor : public NodeProcessor {
   bool IsDataTypeFloat() const {
     if (node_->attr().find("T") != node_->attr().end()) {
       return kDataTypeIsFloating.Contains(node_->attr().at("T").type());
+    }
+    return false;
+  }
+
+  bool IsDataTypeCus() const {
+    if (node_->attr().find("T") != node_->attr().end()) {
+      return DataTypeIsCus(node_->attr().at("T").type());
     }
     return false;
   }

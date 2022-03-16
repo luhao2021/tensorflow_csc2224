@@ -3172,6 +3172,23 @@ Stream &Stream::ThenBlasGemm(blas::Transpose transa, blas::Transpose transb,
 }
 
 Stream &Stream::ThenBlasGemm(blas::Transpose transa, blas::Transpose transb,
+                             uint64 m, uint64 n, uint64 k, float alpha,
+                             const DeviceMemory<cus> &a, int lda,
+                             const DeviceMemory<cus> &b, int ldb,
+                             float beta, DeviceMemory<cus> *c, int ldc) {
+  VLOG_CALL(PARAM(transa), PARAM(transb), PARAM(m), PARAM(n), PARAM(k),
+            PARAM(alpha), PARAM(a), PARAM(lda), PARAM(b), PARAM(ldb),
+            PARAM(beta), PARAM(c), PARAM(ldc));
+
+  ThenBlasImpl<blas::Transpose, blas::Transpose, uint64, uint64, uint64, float,
+               const DeviceMemory<cus> &, int, const DeviceMemory<cus> &,
+               int, float, DeviceMemory<cus> *, int>
+      impl;
+  return impl(this, &blas::BlasSupport::DoBlasGemm, transa, transb, m, n, k,
+              alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+Stream &Stream::ThenBlasGemm(blas::Transpose transa, blas::Transpose transb,
                              uint64 m, uint64 n, uint64 k, double alpha,
                              const DeviceMemory<double> &a, int lda,
                              const DeviceMemory<double> &b, int ldb,
@@ -3491,6 +3508,29 @@ Stream &Stream::ThenBlasGemmWithAlgorithm(
       const HostOrDeviceScalar<float> &, const DeviceMemory<float> &, int,
       const DeviceMemory<float> &, int, const HostOrDeviceScalar<float> &,
       DeviceMemory<float> *, int, blas::ComputationType, blas::AlgorithmType>
+      impl;
+  return impl(this, &blas::BlasSupport::DoBlasGemmWithAlgorithm, transa, transb,
+              m, n, k, alpha, a, lda, b, ldb, beta, c, ldc, computation_type,
+              algorithm, output_profile_result);
+}
+
+Stream &Stream::ThenBlasGemmWithAlgorithm(
+    blas::Transpose transa, blas::Transpose transb, uint64 m, uint64 n,
+    uint64 k, const HostOrDeviceScalar<cus> &alpha,
+    const DeviceMemory<cus> &a, int lda, const DeviceMemory<cus> &b,
+    int ldb, const HostOrDeviceScalar<cus> &beta, DeviceMemory<cus> *c,
+    int ldc, blas::ComputationType computation_type,
+    blas::AlgorithmType algorithm, blas::ProfileResult *output_profile_result) {
+  VLOG_CALL(PARAM(transa), PARAM(transb), PARAM(m), PARAM(n), PARAM(k),
+            PARAM(alpha), PARAM(a), PARAM(lda), PARAM(b), PARAM(ldb),
+            PARAM(beta), PARAM(c), PARAM(ldc), PARAM(computation_type),
+            PARAM(algorithm));
+
+  ThenBlasWithProfileImpl<
+      blas::Transpose, blas::Transpose, uint64, uint64, uint64,
+      const HostOrDeviceScalar<cus> &, const DeviceMemory<cus> &, int,
+      const DeviceMemory<cus> &, int, const HostOrDeviceScalar<cus> &,
+      DeviceMemory<cus> *, int, blas::ComputationType, blas::AlgorithmType>
       impl;
   return impl(this, &blas::BlasSupport::DoBlasGemmWithAlgorithm, transa, transb,
               m, n, k, alpha, a, lda, b, ldb, beta, c, ldc, computation_type,
@@ -4249,6 +4289,27 @@ Stream &Stream::ThenBlasGemmStridedBatched(
                const DeviceMemory<float> &, int, int64,
                const DeviceMemory<float> &, int, int64, float,
                DeviceMemory<float> *, int, int64, int>
+      impl;
+  return impl(this, &blas::BlasSupport::DoBlasGemmStridedBatched, transa,
+              transb, m, n, k, alpha, a, lda, stride_a, b, ldb, stride_b, beta,
+              c, ldc, stride_c, batch_count);
+}
+
+Stream &Stream::ThenBlasGemmStridedBatched(
+    blas::Transpose transa, blas::Transpose transb, uint64 m, uint64 n,
+    uint64 k, float alpha, const DeviceMemory<cus> &a, int lda,
+    int64 stride_a, const DeviceMemory<cus> &b, int ldb, int64 stride_b,
+    float beta, DeviceMemory<cus> *c, int ldc, int64 stride_c,
+    int batch_count) {
+  VLOG_CALL(PARAM(transa), PARAM(transb), PARAM(m), PARAM(n), PARAM(k),
+            PARAM(alpha), PARAM(a), PARAM(lda), PARAM(stride_a), PARAM(b),
+            PARAM(ldb), PARAM(stride_b), PARAM(beta), PARAM(c), PARAM(ldc),
+            PARAM(stride_c), PARAM(batch_count));
+
+  ThenBlasImpl<blas::Transpose, blas::Transpose, uint64, uint64, uint64, float,
+               const DeviceMemory<cus> &, int, int64,
+               const DeviceMemory<cus> &, int, int64, float,
+               DeviceMemory<cus> *, int, int64, int>
       impl;
   return impl(this, &blas::BlasSupport::DoBlasGemmStridedBatched, transa,
               transb, m, n, k, alpha, a, lda, stride_a, b, ldb, stride_b, beta,

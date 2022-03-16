@@ -208,8 +208,9 @@ bool IsCompatible(DataType desired, DataType returned) {
 
   if (DataTypeIsInteger(desired) && DataTypeIsInteger(returned)) {
     return true;
-  } else if (DataTypeIsFloating(desired) &&
-             (DataTypeIsFloating(returned) || DataTypeIsInteger(returned))) {
+  } else if ((DataTypeIsCus(desired) || DataTypeIsFloating(desired)) &&
+             (DataTypeIsCus(returned) || DataTypeIsFloating(returned) ||
+              DataTypeIsInteger(returned))) {
     return true;
   } else if (DataTypeIsComplex(desired) &&
              (DataTypeIsComplex(returned) || DataTypeIsInteger(returned) ||

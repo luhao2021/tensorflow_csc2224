@@ -42,7 +42,8 @@ Status Conj(AbstractContext* ctx,
             absl::Span<AbstractTensorHandle*> outputs, const char* name) {
   auto dtype = inputs[0]->DataType();
   if (DataTypeIsFloating(BaseType(dtype)) ||
-      DataTypeIsInteger(BaseType(dtype))) {
+      DataTypeIsInteger(BaseType(dtype)) ||
+      DataTypeIsCus(BaseType(dtype))) {
     TF_RETURN_IF_ERROR(Identity(ctx, inputs, outputs, name));
   } else {
     return errors::Unimplemented("Conj does not support complex types yet.");
