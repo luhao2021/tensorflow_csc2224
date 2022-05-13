@@ -176,8 +176,8 @@ def _DefaultGradYs(grad_ys,
                 array_ops.shape(y),
                 constant_op.constant(1, dtype=y.dtype, name="grad_ys_%d" % i)))
         continue
-      if y.dtype.is_floating or y.dtype.is_integer:
-        if not grad_y.dtype.is_floating and not grad_y.dtype.is_integer:
+      if y.dtype.is_floating or y.dtype.is_integer or y.dtype.is_cus:
+        if not grad_y.dtype.is_floating and not grad_y.dtype.is_integer and not grad_y.dtype.is_cus:
           raise TypeError(
               "Gradient type %s generated for real or "
               "integer-valued tensor %s with type %s must be "

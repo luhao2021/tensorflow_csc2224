@@ -21,7 +21,7 @@ limitations under the License.
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
-#include "third_party/eigen3/Eigen/Core"
+#include "tensorflow/core/kernels/cutlass_conv.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/platform/tensor_float_32_utils.h"
 #include "tensorflow/core/util/env_var.h"
@@ -506,6 +506,67 @@ port::StatusOr<PersistentRnnPlan> CreatePersistentRnnPlan(
       cudnnCreatePersistentRNNPlan(rnn_desc, batch_size, data_type, &result));
   return port::StatusOr<PersistentRnnPlan>(PersistentRnnPlan(result));
 }
+
+cutlass::Tensor4DCoord CreateTensor4DCoord(dnn::BatchDescriptor descriptor) {
+  long n = descriptor.count();
+  long h = descriptor.height();
+  long w = descriptor.width();
+  long c = descriptor.feature_map_count();
+  return cutlass::Tensor4DCoord(n,h,w,c);
+}
+
+cutlass::Tensor4DCoord CreateTensor4DCoord(dnn::FilterDescriptor descriptor) {
+  long out = descriptor.output_feature_map_count();
+  long in = descriptor.input_feature_map_count();
+  long height = descriptor.input_filter_height();
+  long width = descriptor.input_filter_width();
+  // cutlass only support NHWC
+  return cutlass::Tensor4DCoord(out, height, width, in);
+}
+
+class CutlassConvolutionDescriptor {
+ public:
+  CutlassConvolutionDescriptor(
+      const dnn::ConvolutionDescriptor& convolution_descriptor) {
+    absl::Span<const int64> strides64 = convolution_descriptor.strides();
+    absl::Span<const int64> padding64 = convolution_descriptor.padding();
+    absl::Span<const int64> dilations64 = convolution_descriptor.dilations();
+    CHECK_NE(convolution_descriptor.pad_alignment(),
+             dnn::PadAlignment::kTensorFlowPadding)
+        << "TensorFlow padding alignment is not supported.";
+
+    // cutlass requires coordinates.
+    padding_ = cutlass::Tensor4DCoord(CheckedNarrowing<int64, int>(padding64[0]),
+                                     CheckedNarrowing<int64, int>(padding64[0]),
+                                     CheckedNarrowing<int64, int>(padding64[1]),
+                                     CheckedNarrowing<int64, int>(padding64[1]));
+    strides_ = cutlass::MatrixCoord(CheckedNarrowing<int64, int>(strides64[0]),
+                                   CheckedNarrowing<int64, int>(strides64[1]));
+    dilations_ =
+        cutlass::MatrixCoord(CheckedNarrowing<int64, int>(dilations64[0]),
+                             CheckedNarrowing<int64, int>(dilations64[1]));
+
+// #if CUDNN_MAJOR >= 7
+//     VLOG(2) << "Requesting grouped convolution: "
+//             << convolution_descriptor.group_count();
+//     CHECK_CUDNN_OK(cudnnSetConvolutionGroupCount(
+//         handle_.get(), convolution_descriptor.group_count()));
+// #else
+//     CHECK_EQ(convolution_descriptor.group_count(), 1)
+//         << "Requested grouped convolution for cuDNN version < 7";
+// #endif
+  }
+  
+  cutlass::Tensor4DCoord padding() {return padding_; }
+  cutlass::MatrixCoord strides() {return strides_; }
+  cutlass::MatrixCoord dilations() {return dilations_; }
+
+ private:
+  cutlass::Tensor4DCoord padding_;
+  cutlass::MatrixCoord strides_;
+  cutlass::MatrixCoord dilations_;
+  SE_DISALLOW_COPY_AND_ASSIGN(CutlassConvolutionDescriptor);
+};
 
 // Turns a BatchDescriptor structure into a cudnn tensor handle within a
 // scope.
@@ -2957,6 +3018,7 @@ dnn::DataType GetConvAccumulatorType(dnn::DataType data_type) {
   switch (data_type) {
     case dnn::DataType::kFloat:
     case dnn::DataType::kDouble:
+    case dnn::DataType::kCus:
       return data_type;
     case dnn::DataType::kHalf:
       return CudnnEnvVar<ConvDoFP32ComputationFP16Input>::IsEnabled()
@@ -2981,6 +3043,9 @@ port::Status CudnnSupport::DoPrepareForConvolution(
     const dnn::AlgorithmConfig& algorithm_config,
     ScratchAllocator* scratch_allocator, dnn::AlgorithmDesc* algorithm_desc,
     DeviceMemory<uint8>* scratch_memory) {
+  if (element_type == dnn::DataType::kCus){
+    return port::Status::OK();
+  }
   CudnnTensorDescriptor input_nd(
       input_descriptor,
       ToCudnnDataType(element_type, input_descriptor.layout()));
@@ -3026,6 +3091,62 @@ port::Status CudnnSupport::DoPrepareForConvolution(
   return port::Status::OK();
 }
 
+port::Status DoCutlassConvolve(
+    dnn::ConvolutionKind kind, const dnn::BatchDescriptor& input_descriptor,
+    DeviceMemoryBase input_data, const dnn::FilterDescriptor& filter_descriptor,
+    DeviceMemoryBase filter_data, const dnn::BatchDescriptor& output_descriptor,
+    DeviceMemoryBase output_data,
+    const dnn::ConvolutionDescriptor& convolution_descriptor) {
+  float falpha = 1.0;
+  void* alpha = static_cast<void*>(&falpha);
+  // Beta is the scaling factor for output.
+  float fbeta = 0.0;
+  void* beta = static_cast<void*>(&fbeta);
+  CutlassConvolutionDescriptor cutlassConvDescriptor(convolution_descriptor);
+  VLOG(3) << "doing cutlassCusConv";
+
+  cudaError_t _status;
+  switch (kind) {
+    case dnn::ConvolutionKind::FORWARD:
+      cutlassCusConvForward(
+          cutlassConvDescriptor.strides(), cutlassConvDescriptor.padding(),
+          cutlassConvDescriptor.dilations(),
+          CreateTensor4DCoord(input_descriptor), input_data.opaque(),
+          CreateTensor4DCoord(filter_descriptor), filter_data.opaque(),
+          CreateTensor4DCoord(output_descriptor), output_data.opaque(), falpha,
+          fbeta);
+      break;
+    case dnn::ConvolutionKind::BACKWARD_DATA:
+      cutlassCusConvBackwardData(
+          cutlassConvDescriptor.strides(), cutlassConvDescriptor.padding(),
+          cutlassConvDescriptor.dilations(),
+          CreateTensor4DCoord(input_descriptor), input_data.opaque(),
+          CreateTensor4DCoord(filter_descriptor), filter_data.opaque(),
+          CreateTensor4DCoord(output_descriptor), output_data.opaque(), falpha,
+          fbeta);
+      break;
+    case dnn::ConvolutionKind::BACKWARD_FILTER:
+      cutlassCusConvBackwardFilter(
+          cutlassConvDescriptor.strides(), cutlassConvDescriptor.padding(),
+          cutlassConvDescriptor.dilations(),
+          CreateTensor4DCoord(input_descriptor), input_data.opaque(),
+          CreateTensor4DCoord(filter_descriptor), filter_data.opaque(),
+          CreateTensor4DCoord(output_descriptor), output_data.opaque(), falpha,
+          fbeta);
+      break;
+    default:
+      return port::InternalError(
+          absl::StrCat("Unexpected convolution kind ", static_cast<int>(kind)));
+  }
+
+  if (!SE_PREDICT_TRUE(_status == cudaSuccess)) {
+    VLOG(3) << _status << "\nin " << __FILE__ << "(" << __LINE__
+        << "): 'cutlassCusConv'";
+    return port::Status(port::error::UNKNOWN, "cutlassCusConv failed");
+  }
+  return port::Status::OK();
+}
+
 port::Status CudnnSupport::DoConvolve(
     dnn::ConvolutionKind kind, dnn::DataType element_type,
     dnn::DataType output_type, Stream* stream,
@@ -3036,6 +3157,12 @@ port::Status CudnnSupport::DoConvolve(
     const dnn::ConvolutionDescriptor& convolution_descriptor,
     dnn::AlgorithmDesc algorithm_desc, DeviceMemory<uint8> scratch_memory,
     dnn::ProfileResult* output_profile_result) {
+  if (element_type == dnn::DataType::kCus) {
+    return DoCutlassConvolve(kind, input_descriptor, input_data, filter_descriptor,
+                      filter_data, output_descriptor, output_data,
+                      convolution_descriptor);
+  }
+
   cudnnDataType_t cudnn_type = ToCudnnDataType(element_type);
   CudnnTensorDescriptor input_nd(input_descriptor, cudnn_type);
   CudnnTensorDescriptor output_nd(output_descriptor,
@@ -3061,7 +3188,6 @@ port::Status CudnnSupport::DoConvolve(
                                                : static_cast<void*>(&fbeta);
 
   const bool is_profiling = output_profile_result != nullptr;
-
   std::unique_ptr<GpuTimer, GpuTimerDeleter> timer;
   if (is_profiling) {
     timer.reset(new GpuTimer(parent_));  // NOLINT
@@ -3760,6 +3886,22 @@ port::Status CudnnSupport::DoFusedConvolve(
       output_descriptor, output_data,
       GetConvAccumulatorType(dnn::DataType::kFloat), scratch_allocator,
       algorithm_config, output_profile_result);
+}
+
+port::Status CudnnSupport::DoFusedConvolve(
+    Stream* stream, const dnn::BatchDescriptor& conv_input_descriptor,
+    const DeviceMemory<cus>& conv_input_data, float conv_input_scale,
+    const dnn::FilterDescriptor& filter_descriptor,
+    const DeviceMemory<cus>& filter_data,
+    const dnn::ConvolutionDescriptor& convolution_descriptor,
+    const DeviceMemory<cus>& side_input_data, float side_input_scale,
+    const dnn::BatchDescriptor& bias_descriptor,
+    const DeviceMemory<cus>& biases, dnn::ActivationMode activation_mode,
+    const dnn::BatchDescriptor& output_descriptor,
+    DeviceMemory<cus>* output_data, ScratchAllocator* scratch_allocator,
+    const dnn::AlgorithmConfig& algorithm_config,
+    dnn::ProfileResult* output_profile_result) {
+  return port::Status(port::error::UNIMPLEMENTED, "not implemented fusedConv for cus");
 }
 
 port::Status CudnnSupport::DoFusedConvolve(

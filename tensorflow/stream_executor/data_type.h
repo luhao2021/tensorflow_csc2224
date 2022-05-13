@@ -60,6 +60,11 @@ struct ToDataType<std::complex<double>> {
   static constexpr DataType value = DataType::kComplexDouble;
 };
 
+template <>
+struct ToDataType<tensorflow::cus> {
+  static constexpr DataType value = DataType::kCus;
+};
+
 }  // namespace dnn
 }  // namespace stream_executor
 

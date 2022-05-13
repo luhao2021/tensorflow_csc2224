@@ -51,20 +51,6 @@ cuda_header_library(
     ],
 )
 
-cuda_header_library(
-    name = "cutlass_headers",
-    hdrs = [
-        ":cutlass-include",
-    ],
-    include_prefix = "third_party/gpus",
-    includes = [
-        ".",
-        "cutlass",
-    ],
-    deps = [":cuda_headers"],
-)
-
-
 cc_library(
     name = "cudart_static",
     srcs = ["cuda/lib/%{cudart_static_lib}"],

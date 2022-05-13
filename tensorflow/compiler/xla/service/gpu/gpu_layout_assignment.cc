@@ -71,6 +71,10 @@ HeuristicLayoutAssignment(const HloInstruction* instr,
     return kAllNCHW;
   }
 
+  if (instr->operand(0)->shape().element_type() == xla::PrimitiveType::CUS) {
+    return kAllNHWC;
+  }
+
   // If we're not Volta or not fp16, or not conv2D, the decision is easy: Use
   // NCHW.
   if (instr->operand(0)->shape().element_type() != xla::PrimitiveType::F16 ||

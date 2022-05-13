@@ -506,6 +506,23 @@ port::Status Stream::FusedConvolveWithAlgorithm(
 }
 
 port::Status Stream::FusedConvolveWithAlgorithm(
+      const dnn::BatchDescriptor &conv_input_descriptor,
+      const DeviceMemory<cus> &conv_input_data, float conv_input_scale,
+      const dnn::FilterDescriptor &filter_descriptor,
+      const DeviceMemory<cus> &filter_data,
+      const dnn::ConvolutionDescriptor &convolution_descriptor,
+      const DeviceMemory<cus> &side_input_data, float side_input_scale,
+      const dnn::BatchDescriptor &bias_descriptor,
+      const DeviceMemory<cus> &biases,
+      dnn::ActivationMode activation_mode,
+      const dnn::BatchDescriptor &output_descriptor,
+      DeviceMemory<cus> *output, ScratchAllocator *scratch_allocator,
+      const dnn::AlgorithmConfig &algorithm_config,
+      dnn::ProfileResult *output_profile_result){
+  return port::UnimplementedError("DNN library is not found.");    
+}
+
+port::Status Stream::FusedConvolveWithAlgorithm(
     const dnn::BatchDescriptor &conv_input_descriptor,
     const DeviceMemory<Eigen::half> &conv_input_data, float conv_input_scale,
     const dnn::FilterDescriptor &filter_descriptor,

@@ -304,9 +304,23 @@ cuda_library(
     ],
     hdrs = ["cutlass_gemm.h"],
     deps = [
-        "@local_config_cuda//cuda:cutlass_headers",
+        "//third_party/cutlass",
         "//tensorflow/core/platform:cus",
         "//tensorflow/core/platform:logging",
+    ],
+    alwayslink = 1,
+)
+
+cuda_library(
+    name = "cutlass_conv",
+    srcs = [
+        "cutlass_conv.cu.cc",
+    ],
+    hdrs = ["cutlass_conv.h"],
+    deps = [
+        "//tensorflow/core/platform:cus",
+        "//tensorflow/stream_executor/platform:platform",
+        "//third_party/cutlass",
     ],
     alwayslink = 1,
 )

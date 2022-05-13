@@ -407,6 +407,7 @@ cc_library(
         "@local_config_cuda//cuda:cudnn_header",
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
+        "//tensorflow/core/kernels:cutlass_conv",
         "//tensorflow/core/platform:tensor_float_32_utils",
         "//tensorflow/stream_executor:dnn",
         "//tensorflow/stream_executor:event",

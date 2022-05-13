@@ -454,22 +454,6 @@ def _find_cudnn_config(base_paths, required_version):
   }
 
 
-def _find_cutlass_config(base_paths, required_version):
-
-  def get_header_version(path):
-    return required_version
-
-  header_path, header_version = _find_header(base_paths,
-                                             ("cutlass.h",),
-                                             required_version,
-                                             get_header_version)
-  cutlass_version = header_version.split(".")[0]
-
-  return {
-    "cutlass_version": cutlass_version,
-    "cutlass_include_dir": os.path.dirname(header_path),
-  }
-
 def _find_cusparse_config(base_paths, required_version, cuda_version):
 
   if _at_least_version(cuda_version, "11.0"):
@@ -638,11 +622,6 @@ def find_cuda_config():
     cudnn_paths = _get_legacy_path("CUDNN_INSTALL_PATH", base_paths)
     cudnn_version = os.environ.get("TF_CUDNN_VERSION", "")
     result.update(_find_cudnn_config(cudnn_paths, cudnn_version))
-
-  if "cutlass" in libraries:
-    cutlass_paths = _get_legacy_path("CUTLASS_INSTALL_PATH", base_paths)
-    cutlass_version = os.environ.get("TF_CUTLASS_VERSION", "")
-    result.update(_find_cutlass_config(cutlass_paths, cutlass_version))
 
   if "nccl" in libraries:
     nccl_paths = _get_legacy_path("NCCL_INSTALL_PATH", base_paths)

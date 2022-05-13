@@ -519,6 +519,8 @@ Status RunGpuConv(const gpu::GpuConvConfig& config,
           return Unimplemented("Unimplemented convolution");
       }
     }
+    case CUS:
+      return RunGpuConvImpl<cus, cus, cus>(params, scratch_allocator, stream, options);
     default:
       return Unimplemented("Unimplemented convolution");
   }
