@@ -199,7 +199,7 @@ class Policy(object):
       raise TypeError("'name' must be a string, but got: %s" % (name,))
     self._name = name
     self._compute_dtype, self._variable_dtype = self._parse_name(name)
-    if name in ('mixed_float16', 'mixed_bloat16'):
+    if name in ('mixed_float16', 'mixed_bloat16', 'mixed_cus'):
       device_compatibility_check.log_device_compatibility_check(name)
 
   def _parse_name(self, name):
@@ -228,6 +228,8 @@ class Policy(object):
       return 'float16', 'float32'
     elif name == 'mixed_bfloat16':
       return 'bfloat16', 'float32'
+    elif name == 'mixed_cus':
+      return 'cus', 'float32'
     elif name == '_infer':
       # The "_infer" policy exists only for compatibility with TF 1, where
       # "_infer" is the default. The behavior matches the behavior of TF 1's
@@ -517,7 +519,8 @@ def set_policy(policy):
   if is_mixed_policy:
     _check_if_mixed_precision_graph_rewrite_is_enabled(policy)
   if (policy is not None and policy.compute_dtype is not None and
-      not dtypes.as_dtype(policy.compute_dtype).is_floating):
+      not dtypes.as_dtype(policy.compute_dtype).is_floating and
+      not dtypes.as_dtype(policy.compute_dtype).is_cus):
     raise ValueError('set_policy can only be used to set the global policy to '
                      'floating-point policies, such as "float32" and '
                      '"mixed_float16", but got policy: %s'

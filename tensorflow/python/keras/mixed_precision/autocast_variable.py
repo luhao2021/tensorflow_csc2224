@@ -524,7 +524,7 @@ class enable_auto_cast_variables(object):  # pylint:disable=invalid-name
   __slots__ = ['_dtype', '_prev_dtype']
 
   def __init__(self, dtype):
-    if dtype and not dtype.is_floating:
+    if dtype and not dtype.is_floating and not dtype.is_cus:
       dtype = None
     self._dtype = dtype
 

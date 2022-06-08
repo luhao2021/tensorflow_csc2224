@@ -2421,7 +2421,7 @@ class Layer(module.Module, version_utils.LayerVersionSelector):
     compute_dtype_object = self._compute_dtype_object
     should_autocast = (
         self._autocast and compute_dtype_object and
-        compute_dtype_object.is_floating)
+        (compute_dtype_object.is_floating or compute_dtype_object.is_cus))
 
     if (should_autocast and
         any(map(self._should_cast_single_input, input_list))):
@@ -2433,7 +2433,8 @@ class Layer(module.Module, version_utils.LayerVersionSelector):
   def _should_cast_single_input(self, x):
     if isinstance(x, _AUTOCAST_TYPES):
       return (self._compute_dtype_object and
-              x.dtype != self._compute_dtype_object and x.dtype.is_floating)
+              x.dtype != self._compute_dtype_object and 
+              (x.dtype.is_floating or x.dtype.is_cus))
     return False
 
   def _cast_single_input(self, x):
