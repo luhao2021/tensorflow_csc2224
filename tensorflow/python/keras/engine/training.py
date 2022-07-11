@@ -556,7 +556,7 @@ class Model(base_layer.Layer, version_utils.ModelVersionSelector):
     # used.
     if isinstance(self._dtype_policy, policy.PolicyV1):
       loss_scale = self._dtype_policy.loss_scale
-    elif self._dtype_policy.name == 'mixed_float16':
+    elif self._dtype_policy.name == 'mixed_float16' or self._dtype_policy.name == 'mixed_cus':
       loss_scale = 'dynamic'
     else:
       loss_scale = None

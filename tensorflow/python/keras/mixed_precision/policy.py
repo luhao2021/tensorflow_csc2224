@@ -369,7 +369,7 @@ class PolicyV1(Policy):
     """
     super(PolicyV1, self).__init__(name)
     if loss_scale == 'auto':
-      loss_scale = 'dynamic' if name == 'mixed_float16' else None
+      loss_scale = 'dynamic' if (name == 'mixed_float16' or name=='mixed_cus') else None
       self._using_default_loss_scale = True
     else:
       self._using_default_loss_scale = False

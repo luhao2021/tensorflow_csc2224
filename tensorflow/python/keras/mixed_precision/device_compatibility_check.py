@@ -23,7 +23,6 @@ import itertools
 from tensorflow.python.framework import config
 from tensorflow.python.platform import tf_logging
 
-
 _COMPAT_CHECK_PREFIX = 'Mixed precision compatibility check (mixed_float16): '
 _COMPAT_CHECK_OK_PREFIX = _COMPAT_CHECK_PREFIX + 'OK'
 _COMPAT_CHECK_WARNING_PREFIX = _COMPAT_CHECK_PREFIX + 'WARNING'
@@ -69,7 +68,7 @@ def _log_device_compatibility_check(policy_name, gpu_details_list):
       is the device details for a GPU, as returned by
       `tf.config.experimental.get_device_details()`.
   """
-  if policy_name != 'mixed_float16':
+  if policy_name != 'mixed_float16' and policy_name != 'mixed_cus':
     # TODO(b/145686977): Log if the policy is 'mixed_bfloat16'. This requires
     # checking if a TPU is available.
     return
@@ -110,18 +109,19 @@ def _log_device_compatibility_check(policy_name, gpu_details_list):
     warning_str += _COMPAT_CHECK_WARNING_SUFFIX
     tf_logging.warn(warning_str)
   elif not supported_device_strs:
-    tf_logging.warn('%s\n'
-                    'The dtype policy mixed_float16 may run slowly because '
-                    'this machine does not have a GPU. Only Nvidia GPUs with '
-                    'compute capability of at least 7.0 run quickly with '
-                    'mixed_float16.\n%s' % (_COMPAT_CHECK_WARNING_PREFIX,
-                                            _COMPAT_CHECK_WARNING_SUFFIX))
+    tf_logging.warn(
+        '%s\n'
+        'The dtype policy mixed_float16 may run slowly because '
+        'this machine does not have a GPU. Only Nvidia GPUs with '
+        'compute capability of at least 7.0 run quickly with '
+        'mixed_float16.\n%s' %
+        (_COMPAT_CHECK_WARNING_PREFIX, _COMPAT_CHECK_WARNING_SUFFIX))
   elif len(supported_device_strs) == 1:
     tf_logging.info('%s\n'
                     'Your GPU will likely run quickly with dtype policy '
                     'mixed_float16 as it has compute capability of at least '
-                    '7.0. Your GPU: %s' % (_COMPAT_CHECK_OK_PREFIX,
-                                           supported_device_strs[0]))
+                    '7.0. Your GPU: %s' %
+                    (_COMPAT_CHECK_OK_PREFIX, supported_device_strs[0]))
   else:
     tf_logging.info('%s\n'
                     'Your GPUs will likely run quickly with dtype policy '

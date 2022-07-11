@@ -2340,7 +2340,7 @@ class Layer(module.Module, version_utils.LayerVersionSelector):
       self._dtype_policy = policy.Policy(dtypes.as_dtype(dtype).name)
     else:
       self._dtype_policy = policy.global_policy()
-    if (self._dtype_policy.name == 'mixed_float16' and
+    if ((self._dtype_policy.name == 'mixed_float16' or self._dtype_policy.name == 'mixed_cus') and
         not loss_scale_optimizer.strategy_supports_loss_scaling()):
       # Although only loss scaling doesn't support certain strategies, to avoid
       # confusion, we disallow the 'mixed_float16' policy with unsupported
