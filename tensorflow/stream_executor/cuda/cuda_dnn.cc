@@ -3092,47 +3092,55 @@ port::Status CudnnSupport::DoPrepareForConvolution(
 }
 
 port::Status DoCutlassConvolve(
-    dnn::ConvolutionKind kind, const dnn::BatchDescriptor& input_descriptor,
+    Stream* stream, dnn::ConvolutionKind kind, const dnn::BatchDescriptor& input_descriptor,
     DeviceMemoryBase input_data, const dnn::FilterDescriptor& filter_descriptor,
     DeviceMemoryBase filter_data, const dnn::BatchDescriptor& output_descriptor,
     DeviceMemoryBase output_data,
-    const dnn::ConvolutionDescriptor& convolution_descriptor) {
+    const dnn::ConvolutionDescriptor& convolution_descriptor, DeviceMemory<uint8> scratch_memory) {
   float falpha = 1.0;
   void* alpha = static_cast<void*>(&falpha);
   // Beta is the scaling factor for output.
   float fbeta = 0.0;
   void* beta = static_cast<void*>(&fbeta);
   CutlassConvolutionDescriptor cutlassConvDescriptor(convolution_descriptor);
-  VLOG(3) << "doing cutlassCusConv";
 
   cudaError_t _status;
   switch (kind) {
     case dnn::ConvolutionKind::FORWARD:
-      cutlassCusConvForward(
+      VLOG(3) << "doing cutlass convolution forward for cus";
+      _status = cutlassCusConvForward(
+        AsGpuStreamValue(stream),
           cutlassConvDescriptor.strides(), cutlassConvDescriptor.padding(),
           cutlassConvDescriptor.dilations(),
           CreateTensor4DCoord(input_descriptor), input_data.opaque(),
           CreateTensor4DCoord(filter_descriptor), filter_data.opaque(),
           CreateTensor4DCoord(output_descriptor), output_data.opaque(), falpha,
-          fbeta);
+          fbeta, /*workSpace=*/scratch_memory.opaque(),
+          /*workSpaceSizeInBytes=*/scratch_memory.size());
       break;
     case dnn::ConvolutionKind::BACKWARD_DATA:
-      cutlassCusConvBackwardData(
+      VLOG(3) << "doing cutlass convolution backward_data for cus";
+      _status = cutlassCusConvBackwardData(
+        AsGpuStreamValue(stream),
           cutlassConvDescriptor.strides(), cutlassConvDescriptor.padding(),
           cutlassConvDescriptor.dilations(),
           CreateTensor4DCoord(input_descriptor), input_data.opaque(),
           CreateTensor4DCoord(filter_descriptor), filter_data.opaque(),
           CreateTensor4DCoord(output_descriptor), output_data.opaque(), falpha,
-          fbeta);
+          fbeta, /*workSpace=*/scratch_memory.opaque(),
+          /*workSpaceSizeInBytes=*/scratch_memory.size());
       break;
     case dnn::ConvolutionKind::BACKWARD_FILTER:
-      cutlassCusConvBackwardFilter(
+      VLOG(3) << "doing cutlass convolution backward_filter for cus";
+      _status = cutlassCusConvBackwardFilter(
+        AsGpuStreamValue(stream),
           cutlassConvDescriptor.strides(), cutlassConvDescriptor.padding(),
           cutlassConvDescriptor.dilations(),
           CreateTensor4DCoord(input_descriptor), input_data.opaque(),
           CreateTensor4DCoord(filter_descriptor), filter_data.opaque(),
           CreateTensor4DCoord(output_descriptor), output_data.opaque(), falpha,
-          fbeta);
+          fbeta, /*workSpace=*/scratch_memory.opaque(),
+          /*workSpaceSizeInBytes=*/scratch_memory.size());
       break;
     default:
       return port::InternalError(
@@ -3158,9 +3166,9 @@ port::Status CudnnSupport::DoConvolve(
     dnn::AlgorithmDesc algorithm_desc, DeviceMemory<uint8> scratch_memory,
     dnn::ProfileResult* output_profile_result) {
   if (element_type == dnn::DataType::kCus) {
-    return DoCutlassConvolve(kind, input_descriptor, input_data, filter_descriptor,
+    return DoCutlassConvolve(stream, kind, input_descriptor, input_data, filter_descriptor,
                       filter_data, output_descriptor, output_data,
-                      convolution_descriptor);
+                      convolution_descriptor, scratch_memory);
   }
 
   cudnnDataType_t cudnn_type = ToCudnnDataType(element_type);

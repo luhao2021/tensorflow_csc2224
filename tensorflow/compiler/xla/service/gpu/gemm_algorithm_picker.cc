@@ -262,9 +262,14 @@ static StatusOr<absl::optional<se::blas::AlgorithmType>> DoGemmAutotune(
 
   int64 batch_size = gemm_config.batch_size();
   absl::optional<se::blas::AlgorithmType> result;
+  auto op0_type = instr->operand(0)->shape().element_type();
+  auto op1_type = instr->operand(1)->shape().element_type();
   if (batch_size != 1) {
     // TODO(b/112111608): Implement auto tune for batched gemm.
     VLOG(2) << "Batch size is non-singular, using generic algorithm";
+    result = absl::nullopt;
+  } else if (op0_type == CUS || op1_type == CUS) {
+    VLOG(2) << "data type is cus, no need to autotune";
     result = absl::nullopt;
   } else {
     TF_ASSIGN_OR_RETURN(result,

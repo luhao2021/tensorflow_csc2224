@@ -226,7 +226,7 @@ REGISTER_OP("ComplexAbs")
   Input("y: T")                                                          \
       .Input("dy: T")                                                    \
       .Output("z: T")                                                    \
-      .Attr("T: {bfloat16, half, float, double, complex64, complex128}") \
+      .Attr("T: {bfloat16, cus, half, float, double, complex64, complex128}") \
       .SetShapeFn(shape_inference::UnchangedShape)
 
 REGISTER_OP("Neg").UNARY();

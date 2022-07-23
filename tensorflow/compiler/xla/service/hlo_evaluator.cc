@@ -779,6 +779,11 @@ Status HloEvaluator::HandleCompare(HloInstruction* compare) {
                           Compare<float>(compare->shape(), direction,
                                          lhs_literal, rhs_literal));
     } break;
+    case CUS: {
+      TF_ASSIGN_OR_RETURN(evaluated_[compare],
+                          Compare<cus>(compare->shape(), direction,
+                                         lhs_literal, rhs_literal));
+    } break;
     case F64: {
       TF_ASSIGN_OR_RETURN(evaluated_[compare],
                           Compare<double>(compare->shape(), direction,

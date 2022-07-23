@@ -3,33 +3,33 @@
 #include <vector>
 
 #include "cutlass/conv/device/implicit_gemm_convolution.h"
-#include "cutlass/conv/kernel/default_conv2d_fprop.h"
 #include "cutlass/conv/kernel/default_conv2d_dgrad.h"
+#include "cutlass/conv/kernel/default_conv2d_fprop.h"
 #include "cutlass/conv/kernel/default_conv2d_wgrad.h"
+#include "cutlass/conv/threadblock/threadblock_swizzle.h"
 #include "cutlass/gemm/device/gemm.h"
 #include "cutlass/util/host_tensor.h"
 #include "cutlass/util/reference/host/convolution.h"
+#include "cutlass/util/reference/host/tensor_fill.h"
 #include "cutlass/util/tensor_view_io.h"
-#include "cutlass/conv/threadblock/threadblock_swizzle.h"
 #include "tensorflow/stream_executor/platform/logging.h"
 
-#include "cutlass/util/reference/host/tensor_fill.h"
-#include "cutlass/util/host_tensor.h"
-
-cudaError_t cutlassCusConvForward(MatrixCoord stride, Tensor4DCoord padding,
-                           MatrixCoord dilation, Tensor4DCoord input_size,
-                           void* input_data, Tensor4DCoord filter_size,
-                           void* filter_data, Tensor4DCoord output_size,
-                           void* output_data, float alpha, float beta) {
+cudaError_t cutlassCusConvForward(CUstream stream, MatrixCoord stride,
+                                  Tensor4DCoord padding, MatrixCoord dilation,
+                                  Tensor4DCoord input_size, void* input_data,
+                                  Tensor4DCoord filter_size, void* filter_data,
+                                  Tensor4DCoord output_size, void* output_data,
+                                  float alpha, float beta, void* workSpace,
+                                  size_t workSpaceSizeInBytes) {
   using ElementA = cus;
   using ElementB = cus;
   using ElementC = cus;
-  using ElementAccumulator = cus;
+  using ElementAccumulator = float;
   using ElementCompute = cus;
   using SmArch = cutlass::arch::Sm75;
 
   using ThreadblockShape = cutlass::gemm::GemmShape<128, 128, 8>;
-  using WarpShape = cutlass::gemm::GemmShape<64, 64, 8>;
+  using WarpShape = cutlass::gemm::GemmShape<32, 32, 8>;
   using InstructionShape = cutlass::gemm::GemmShape<1, 1, 1>;
 
   using EpilogueOp = cutlass::epilogue::thread::LinearCombination<
@@ -39,7 +39,9 @@ cudaError_t cutlassCusConvForward(MatrixCoord stride, Tensor4DCoord padding,
                            // math instructions in the epilogue too.
       ElementAccumulator,  // Data type of accumulator
       ElementCompute,
-      cutlass::epilogue::thread::ScaleType::Default>;     // Data type for alpha/beta in linear combination
+      cutlass::epilogue::thread::ScaleType::Default>;  // Data type for
+                                                       // alpha/beta in linear
+                                                       // combination
 
   using Conv2d = typename cutlass::conv::kernel::DefaultConv2dFprop<
       ElementA, cutlass::layout::TensorNHWC, ElementB,
@@ -50,8 +52,7 @@ cudaError_t cutlassCusConvForward(MatrixCoord stride, Tensor4DCoord padding,
       cutlass::arch::OpMultiplyAddSaturate,
       cutlass::conv::IteratorAlgorithm::kAnalytic>::Kernel;
 
-  using ImplicitGemm =
-      cutlass::conv::device::ImplicitGemmConvolution<Conv2d>;
+  using ImplicitGemm = cutlass::conv::device::ImplicitGemmConvolution<Conv2d>;
 
   cutlass::conv::Mode mode = cutlass::conv::Mode::kCrossCorrelation;
 
@@ -83,27 +84,26 @@ cudaError_t cutlassCusConvForward(MatrixCoord stride, Tensor4DCoord padding,
 
   ImplicitGemm implicitGemmOp;
   size_t workspace_size = implicitGemmOp.get_workspace_size(arguments);
-  cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
-
   cutlass::Status status = implicitGemmOp.can_implement(arguments);
-  if (status != cutlass::Status::kSuccess) VLOG(3)<<  "operation not possible" << cutlassGetStatusString(status);
-  implicitGemmOp.initialize(arguments, workspace.get());
-  status = implicitGemmOp();
+  if (status != cutlass::Status::kSuccess)
+    VLOG(3) << "operation not possible" << cutlassGetStatusString(status);
+  status = implicitGemmOp(arguments, workSpace, stream);
   if (status != cutlass::Status::kSuccess) {
     return cudaErrorUnknown;
   }
   return cudaSuccess;
 }
 
-cudaError_t cutlassCusConvBackwardData(MatrixCoord stride, Tensor4DCoord padding,
-                           MatrixCoord dilation, Tensor4DCoord input_size,
-                           void* input_data, Tensor4DCoord filter_size,
-                           void* filter_data, Tensor4DCoord output_size,
-                           void* output_data, float alpha, float beta) {
+cudaError_t cutlassCusConvBackwardData(
+    CUstream stream, MatrixCoord stride, Tensor4DCoord padding,
+    MatrixCoord dilation, Tensor4DCoord input_size, void* input_data,
+    Tensor4DCoord filter_size, void* filter_data, Tensor4DCoord output_size,
+    void* output_data, float alpha, float beta, void* workSpace,
+    size_t workSpaceSizeInBytes) {
   using ElementA = cus;
   using ElementB = cus;
   using ElementC = cus;
-  using ElementAccumulator = cus;
+  using ElementAccumulator = float;
   using ElementCompute = cus;
   using SmArch = cutlass::arch::Sm75;
 
@@ -118,7 +118,9 @@ cudaError_t cutlassCusConvBackwardData(MatrixCoord stride, Tensor4DCoord padding
                            // math instructions in the epilogue too.
       ElementAccumulator,  // Data type of accumulator
       ElementCompute,
-      cutlass::epilogue::thread::ScaleType::Default>;     // Data type for alpha/beta in linear combination
+      cutlass::epilogue::thread::ScaleType::Default>;  // Data type for
+                                                       // alpha/beta in linear
+                                                       // combination
 
   using Conv2d = typename cutlass::conv::kernel::DefaultConv2dDgrad<
       ElementA, cutlass::layout::TensorNHWC, ElementB,
@@ -130,8 +132,7 @@ cudaError_t cutlassCusConvBackwardData(MatrixCoord stride, Tensor4DCoord padding
       cutlass::conv::IteratorAlgorithm::kAnalytic,
       cutlass::conv::StrideSupport::kStrided>::Kernel;
 
-  using ImplicitGemm =
-      cutlass::conv::device::ImplicitGemmConvolution<Conv2d>;
+  using ImplicitGemm = cutlass::conv::device::ImplicitGemmConvolution<Conv2d>;
 
   cutlass::conv::Mode mode = cutlass::conv::Mode::kCrossCorrelation;
 
@@ -163,28 +164,27 @@ cudaError_t cutlassCusConvBackwardData(MatrixCoord stride, Tensor4DCoord padding
 
   ImplicitGemm implicitGemmOp;
   size_t workspace_size = implicitGemmOp.get_workspace_size(arguments);
-  cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
 
   cutlass::Status status = implicitGemmOp.can_implement(arguments);
-  if (status != cutlass::Status::kSuccess) VLOG(3)<<  "operation not possible" << cutlassGetStatusString(status);
-  implicitGemmOp.initialize(arguments, workspace.get());
-  status = implicitGemmOp();
+  if (status != cutlass::Status::kSuccess)
+    VLOG(3) << "operation not possible" << cutlassGetStatusString(status);
+  status = implicitGemmOp(arguments, workSpace, stream);
   if (status != cutlass::Status::kSuccess) {
     return cudaErrorUnknown;
   }
   return cudaSuccess;
 }
 
-
-cudaError_t cutlassCusConvBackwardFilter(MatrixCoord stride, Tensor4DCoord padding,
-                           MatrixCoord dilation, Tensor4DCoord input_size,
-                           void* input_data, Tensor4DCoord filter_size,
-                           void* filter_data, Tensor4DCoord output_size,
-                           void* output_data, float alpha, float beta) {
+cudaError_t cutlassCusConvBackwardFilter(
+    CUstream stream, MatrixCoord stride, Tensor4DCoord padding,
+    MatrixCoord dilation, Tensor4DCoord input_size, void* input_data,
+    Tensor4DCoord filter_size, void* filter_data, Tensor4DCoord output_size,
+    void* output_data, float alpha, float beta, void* workSpace,
+    size_t workSpaceSizeInBytes) {
   using ElementA = cus;
   using ElementB = cus;
   using ElementC = cus;
-  using ElementAccumulator = cus;
+  using ElementAccumulator = float;
   using ElementCompute = cus;
   using SmArch = cutlass::arch::Sm75;
 
@@ -199,7 +199,9 @@ cudaError_t cutlassCusConvBackwardFilter(MatrixCoord stride, Tensor4DCoord paddi
                            // math instructions in the epilogue too.
       ElementAccumulator,  // Data type of accumulator
       ElementCompute,
-      cutlass::epilogue::thread::ScaleType::Default>;     // Data type for alpha/beta in linear combination
+      cutlass::epilogue::thread::ScaleType::Default>;  // Data type for
+                                                       // alpha/beta in linear
+                                                       // combination
 
   using Conv2d = typename cutlass::conv::kernel::DefaultConv2dWgrad<
       ElementA, cutlass::layout::TensorNHWC, ElementB,
@@ -210,8 +212,7 @@ cudaError_t cutlassCusConvBackwardFilter(MatrixCoord stride, Tensor4DCoord paddi
       cutlass::arch::OpMultiplyAdd,
       cutlass::conv::IteratorAlgorithm::kAnalytic>::Kernel;
 
-  using ImplicitGemm =
-      cutlass::conv::device::ImplicitGemmConvolution<Conv2d>;
+  using ImplicitGemm = cutlass::conv::device::ImplicitGemmConvolution<Conv2d>;
 
   cutlass::conv::Mode mode = cutlass::conv::Mode::kCrossCorrelation;
 
@@ -236,36 +237,34 @@ cudaError_t cutlassCusConvBackwardFilter(MatrixCoord stride, Tensor4DCoord paddi
   cutlass::TensorRef<cus, cutlass::layout::TensorNHWC> tensor_c(
       static_cast<cus*>(output_data), layout_c);
 
-//   typename ImplicitGemm::Arguments arguments{
-//       problem_size, tensor_x,
-//       tensor_w,     tensor_c,
-//       tensor_c,     {static_cast<cus>(alpha), static_cast<cus>(beta)}};
+  //   typename ImplicitGemm::Arguments arguments{
+  //       problem_size, tensor_x,
+  //       tensor_w,     tensor_c,
+  //       tensor_c,     {static_cast<cus>(alpha), static_cast<cus>(beta)}};
 
- typename ImplicitGemm::Arguments arguments{
+  typename ImplicitGemm::Arguments arguments{
       problem_size, tensor_c,
       tensor_x,     tensor_w,
       tensor_w,     {static_cast<cus>(alpha), static_cast<cus>(beta)}};
 
   ImplicitGemm implicitGemmOp;
   size_t workspace_size = implicitGemmOp.get_workspace_size(arguments);
-  cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
+  //   cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
 
   cutlass::Status status = implicitGemmOp.can_implement(arguments);
-  if (status != cutlass::Status::kSuccess) VLOG(3)<<  "operation not possible" << cutlassGetStatusString(status);
-  implicitGemmOp.initialize(arguments, workspace.get());
-  status = implicitGemmOp();
+  if (status != cutlass::Status::kSuccess)
+    VLOG(3) << "operation not possible" << cutlassGetStatusString(status);
+  status = implicitGemmOp(arguments, workSpace, stream);
   if (status != cutlass::Status::kSuccess) {
     return cudaErrorUnknown;
   }
   return cudaSuccess;
 }
 
-
 cudaError_t cutlassCusBiasActivationConv(
-    MatrixCoord stride, Tensor4DCoord padding, MatrixCoord dilation,
-    Tensor4DCoord input_size, const void* input_data, Tensor4DCoord filter_size,
-    const void* filter_data, Tensor4DCoord output_size, void* output_data,
-    float alpha, float beta) {
+    CUstream stream, MatrixCoord stride, Tensor4DCoord padding,
+    MatrixCoord dilation, Tensor4DCoord input_size, const void* input_data,
+    Tensor4DCoord filter_size, const void* filter_data,
+    Tensor4DCoord output_size, void* output_data, float alpha, float beta) {
   return cudaErrorUnknown;
 }
-

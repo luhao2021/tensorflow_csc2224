@@ -36,4 +36,9 @@ ForceCompile(CusLe);
 ForceCompile(CusGt);
 ForceCompile(CusGe);
 
+// ForceCompile(CusLog);
+// ForceCompile(CusExp);
+// ForceCompile(CusSqrt);
+ForceCompile(CusRsqrt);
+
 }  // namespace tensorflow

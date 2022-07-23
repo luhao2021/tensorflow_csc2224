@@ -92,6 +92,7 @@
 
 # Allow builds using libc++ as a linker library
 # This is mostly for OSSFuzz, so we also pass in the flags from environment to clean build file
+build --incompatible_strict_action_env
 build:libc++ --action_env=CC
 build:libc++ --action_env=CXX
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++

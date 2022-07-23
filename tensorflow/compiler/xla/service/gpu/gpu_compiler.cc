@@ -30,9 +30,9 @@ limitations under the License.
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/Linker/Linker.h"
-#include "mlir/IR/Module.h"  // from @llvm-project
+#include "llvm/Support/SourceMgr.h"
+#include "mlir/IR/Module.h"        // from @llvm-project
 #include "mlir/InitAllDialects.h"  // from @llvm-project
 #include "tensorflow/compiler/xla/protobuf_util.h"
 #include "tensorflow/compiler/xla/service/algebraic_simplifier.h"
@@ -455,7 +455,7 @@ Status GpuCompiler::OptimizeHloPostLayoutAssignment(
   // the gte(customcall, 0) would probably already be into a fusion node.  We
   // can't simplify across HloComputation boundaries, so in this case we
   // wouldn't be able to simplify away the new_tuple bits.
-  pipeline.AddPass<GpuConvAlgorithmPicker>(stream_exec, device_allocator);
+  // pipeline.AddPass<GpuConvAlgorithmPicker>(stream_exec, device_allocator);
 
   // Clean up new_tuple described above.
   pipeline.AddPass<TupleSimplifier>();
@@ -713,16 +713,18 @@ StatusOr<std::unique_ptr<Executable>> GpuCompiler::RunBackend(
   if (user_pre_optimization_hook_) {
     user_pre_optimization_hook_(*llvm_module);
   }
+
+  llvm::SMDiagnostic diagnostic;
+  auto m = llvm::parseIRFile("tensorflow/core/platform/cus.bc", diagnostic,
+                             llvm_context);
+  llvm::Linker::linkModules(*llvm_module, std::move(m));
+
   string ir_module_string_before_opt;
   const bool embed_ir_in_executable =
       module->config().debug_options().xla_embed_ir_in_executable();
   if (embed_ir_in_executable) {
     ir_module_string_before_opt = llvm_ir::DumpModuleToString(*llvm_module);
   }
-
-  llvm::SMDiagnostic diagnostic;
-  auto m = llvm::parseIRFile("tensorflow/core/platform/cus.bc", diagnostic, llvm_context);
-  llvm::Linker::linkModules(*llvm_module, std::move(m));
 
   llvm_ir::DumpIrIfEnabled(*module, *llvm_module, /*optimized=*/false);
 

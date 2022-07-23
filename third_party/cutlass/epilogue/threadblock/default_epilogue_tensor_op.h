@@ -124,6 +124,30 @@ struct DefaultIteratorsTensorOp<float, float, 4, ThreadblockShape, WarpShape, In
   static int const kFragmentsPerIteration = 2;
 };
 
+/// Partial specialization for cus <= float x 4
+template <
+  typename ThreadblockShape,
+  typename WarpShape,
+  typename InstructionShape,
+  typename ThreadMap
+>
+struct DefaultIteratorsTensorOp<cus, float, 4, ThreadblockShape, WarpShape, InstructionShape, ThreadMap> {
+  
+  using WarpTileIterator = cutlass::epilogue::warp::TileIteratorTensorOp<
+    WarpShape,
+    InstructionShape,
+    float,
+    layout::RowMajor
+  >;
+
+  using SharedLoadIterator = cutlass::epilogue::threadblock::SharedLoadIterator<
+    ThreadMap,
+    float
+  >;
+
+  static int const kFragmentsPerIteration = 1;
+};
+
 /// Partial specialization for half <= float x 8 epilogues avoids shared memory bank conflicts.
 template <
   typename ThreadblockShape,

@@ -76,7 +76,7 @@ REGISTER_OP("AvgPool")
     .Attr("strides: list(int) >= 4")
     .Attr(GetPaddingAttrString())
     .Attr(GetConvnetDataFormatAttrString())
-    .Attr("T: {half, bfloat16, float, double}")
+    .Attr("T: {half, bfloat16, float, double, cus}")
     .SetShapeFn(shape_inference::AvgPoolShape);
 
 REGISTER_OP("AvgPoolGrad")
@@ -87,7 +87,7 @@ REGISTER_OP("AvgPoolGrad")
     .Attr("strides: list(int) >= 4")
     .Attr(GetPaddingAttrString())
     .Attr(GetConvnetDataFormatAttrString())
-    .Attr("T: {half, bfloat16, float, double}")
+    .Attr("T: {half, bfloat16, float, double, cus}")
     .SetShapeFn(shape_inference::AvgPoolGradShape);
 
 // --------------------------------------------------------------------------
