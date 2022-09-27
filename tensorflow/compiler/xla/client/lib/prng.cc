@@ -519,6 +519,7 @@ RngOutput PhiloxBitGenerator(XlaOp key, XlaOp initial_state,
     case F32:
     case U32:
     case S32:
+    case CUS:
       return PhiloxRngBit32(key, initial_state, shape);
     case F64:
     case U64:

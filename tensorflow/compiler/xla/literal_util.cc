@@ -207,6 +207,8 @@ Literal ConvertType(LiteralSlice literal) {
       return LiteralUtil::CreateR0<half>(static_cast<half>(1.0f));
     case BF16:
       return LiteralUtil::CreateR0<bfloat16>(static_cast<bfloat16>(1.0f));
+    case CUS:
+      return LiteralUtil::CreateR0<cus>(static_cast<cus>(1.0f));
     case F32:
       return LiteralUtil::CreateR0<float>(1);
     case F64:
@@ -306,6 +308,9 @@ Literal ConvertType(LiteralSlice literal) {
     case BF16:
       return LiteralUtil::CreateR0<bfloat16>(
           static_cast<bfloat16>(std::numeric_limits<float>::infinity()));
+    case CUS:
+      return LiteralUtil::CreateR0<cus>(
+          static_cast<cus>(std::numeric_limits<float>::infinity()));
     case TUPLE:
       LOG(FATAL) << "tuple element type has no maximum value";
     case OPAQUE_TYPE:
@@ -324,6 +329,9 @@ Literal ConvertType(LiteralSlice literal) {
     case BF16:
       return LiteralUtil::CreateR0<bfloat16>(
           static_cast<bfloat16>(std::numeric_limits<float>::quiet_NaN()));
+    case CUS:
+      return LiteralUtil::CreateR0<cus>(
+          static_cast<cus>(std::numeric_limits<float>::quiet_NaN()));
     case F32:
       return LiteralUtil::CreateR0<float>(
           std::numeric_limits<float>::quiet_NaN());

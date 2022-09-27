@@ -16,7 +16,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/gpu/gpu_compiler.h"
 
 #include <stdlib.h>
-
+#include <fstream>
 #include <atomic>
 #include <functional>
 #include <utility>
@@ -715,9 +715,17 @@ StatusOr<std::unique_ptr<Executable>> GpuCompiler::RunBackend(
   }
 
   llvm::SMDiagnostic diagnostic;
-  auto m = llvm::parseIRFile("tensorflow/core/platform/cus.bc", diagnostic,
+    
+  string cus_ir_file = "/tmp/tf/cus.bc";
+  // check if cus ir file exists
+  std::ifstream infile(cus_ir_file);
+  if (!infile.good()) {
+    return tensorflow::errors::NotFound("Failed to find file",
+                                        cus_ir_file, ", use clang++ to compile cus.h first");
+  }
+  auto cus_module = llvm::parseIRFile(cus_ir_file, diagnostic,
                              llvm_context);
-  llvm::Linker::linkModules(*llvm_module, std::move(m));
+  llvm::Linker::linkModules(*llvm_module, std::move(cus_module));
 
   string ir_module_string_before_opt;
   const bool embed_ir_in_executable =

@@ -5140,8 +5140,8 @@ def dropout_v2(x, rate, noise_shape=None, seed=None, name=None):
                        "range [0, 1), got %g" % rate)
     x = ops.convert_to_tensor(x, name="x")
     x_dtype = x.dtype
-    if not x_dtype.is_floating:
-      raise ValueError("x has to be a floating point tensor since it's going "
+    if not x_dtype.is_floating and not x_dtype.is_cus:
+      raise ValueError("x has to be a floating point tensor or a cus type since it's going "
                        "to be scaled. Got a %s tensor instead." % x_dtype)
     is_executing_eagerly = context.executing_eagerly()
     if not tensor_util.is_tensor(rate):

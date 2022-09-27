@@ -1113,7 +1113,8 @@ REGISTER_OP("LeakyRelu")
     .Input("features: T")
     .Output("activations: T")
     .Attr("alpha: float = 0.2")
-    .Attr("T: {half, bfloat16, float, double} = DT_FLOAT")
+    .Attr("T: {half, bfloat16, float, double, cus}")
+    // .Attr("T: {half, bfloat16, float, double} = DT_FLOAT")
     .SetShapeFn(shape_inference::UnchangedShape);
 
 REGISTER_OP("LeakyReluGrad")
@@ -1121,7 +1122,8 @@ REGISTER_OP("LeakyReluGrad")
     .Input("features: T")
     .Output("backprops: T")
     .Attr("alpha: float = 0.2")
-    .Attr("T: {half, bfloat16, float, double} = DT_FLOAT")
+    .Attr("T: {half, bfloat16, float, double, cus}")
+    // .Attr("T: {half, bfloat16, float, double} = DT_FLOAT")
     .SetShapeFn(shape_inference::MergeBothInputsShapeFn);
 
 REGISTER_OP("Elu")
