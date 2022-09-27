@@ -44,10 +44,9 @@ def normalize(images, mean, std):
 
 def dataset_generator(images, labels, batch_size):
   ds = tf.data.Dataset.from_tensor_slices((images, labels))
-  ds = ds.map(
-      _augment_fn, num_parallel_calls=1)  #tf.data.experimental.AUTOTUNE)
+  ds = ds.map(_augment_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
   ds = ds.shuffle(len(images), seed=0).batch(batch_size)
-  # ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+  ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
   return ds
 
 

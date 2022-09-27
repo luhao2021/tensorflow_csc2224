@@ -84,7 +84,7 @@ from tensorflow.python.util import nest
 from tensorflow.python.util import tf_decorator
 from tensorflow.python.util.tf_export import keras_export
 from tensorflow.tools.docs import doc_controls
-
+import tensorflow as tf
 
 # pylint: disable=g-import-not-at-top
 try:
@@ -293,6 +293,8 @@ class Model(base_layer.Layer, version_utils.ModelVersionSelector):
     self._init_batch_counters()
     self._base_model_initialized = True
 
+    self._jit_compile = None
+
   @trackable.no_automatic_dependency_tracking
   def _init_batch_counters(self):
     # Untracked Variables, used to keep track of mini-batches seen in `fit`,
@@ -454,6 +456,7 @@ class Model(base_layer.Layer, version_utils.ModelVersionSelector):
               weighted_metrics=None,
               run_eagerly=None,
               steps_per_execution=None,
+              jit_compile=None,
               **kwargs):
     """Configures the model for training.
 
@@ -547,6 +550,12 @@ class Model(base_layer.Layer, version_utils.ModelVersionSelector):
       self._is_compiled = True
 
       self.loss = loss or {}  # Backwards compat.
+      if (self._run_eagerly or self.dynamic) and jit_compile:
+        raise ValueError(
+            'You cannot enable `run_eagerly` and `jit_compile` '
+            'at the same time.')
+      else:
+        self._jit_compile = jit_compile
 
   def _get_optimizer(self, optimizer):
     """Wraps `optimizer` in `LossScaleOptimizer` if necessary."""
@@ -556,7 +565,7 @@ class Model(base_layer.Layer, version_utils.ModelVersionSelector):
     # used.
     if isinstance(self._dtype_policy, policy.PolicyV1):
       loss_scale = self._dtype_policy.loss_scale
-    elif self._dtype_policy.name == 'mixed_float16' or self._dtype_policy.name == 'mixed_cus':
+    elif self._dtype_policy.name == 'mixed_float16':
       loss_scale = 'dynamic'
     else:
       loss_scale = None
@@ -790,6 +799,12 @@ class Model(base_layer.Layer, version_utils.ModelVersionSelector):
         with ops.control_dependencies(_minimum_control_deps(outputs)):
           model._train_counter.assign_add(1)  # pylint: disable=protected-access
         return outputs
+
+      if self._jit_compile:
+        run_step = tf.function(
+            run_step, experimental_compile=True, experimental_relax_shapes=True)
+      else:
+        run_step = tf.function(run_step)
 
       data = next(iterator)
       outputs = model.distribute_strategy.run(run_step, args=(data,))
@@ -1219,7 +1234,12 @@ class Model(base_layer.Layer, version_utils.ModelVersionSelector):
         with ops.control_dependencies(_minimum_control_deps(outputs)):
           model._test_counter.assign_add(1)  # pylint: disable=protected-access
         return outputs
-
+      
+      if self._jit_compile:
+        run_step = tf.function(
+            run_step, experimental_compile=True, experimental_relax_shapes=True)
+      else:
+        run_step = tf.function(run_step)
       data = next(iterator)
       outputs = model.distribute_strategy.run(run_step, args=(data,))
       outputs = reduce_per_replica(
@@ -1464,6 +1484,11 @@ class Model(base_layer.Layer, version_utils.ModelVersionSelector):
           model._predict_counter.assign_add(1)  # pylint: disable=protected-access
         return outputs
 
+      if self._jit_compile:
+        run_step = tf.function(
+            run_step, experimental_compile=True, experimental_relax_shapes=True)
+      else:
+        run_step = tf.function(run_step)
       data = next(iterator)
       outputs = model.distribute_strategy.run(run_step, args=(data,))
       outputs = reduce_per_replica(

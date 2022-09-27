@@ -143,12 +143,18 @@ cc_library(
     ],
 )
 
+
+cc_library(
+    name = "emulation",
+    hdrs = [":emulation_hdrs"],
+)
+
 cc_library(
     name = "cus",
     hdrs = ["cus.h"],
-    compatible_with = get_compatible_with_portable(),
     deps = [
-    ],
+        "emulation",
+    ]
 )
 
 cc_library(
@@ -1346,12 +1352,18 @@ filegroup(
 )
 
 filegroup(
+    name = "emulation_hdrs",
+    srcs = glob(["emulation/*.h"])
+)
+
+filegroup(
     name = "lib_hdrs",
     srcs = [
         "abi.h",
         "base64.h",
         "bfloat16.h",
         "cus.h",
+        ":emulation_hdrs",
         "casts.h",
         "coding.h",
         "context.h",
@@ -1439,7 +1451,6 @@ filegroup(
     name = "framework_lite_hdrs",
     srcs = [
         "bfloat16.h",
-        "cus.h",
         "byte_order.h",
         "cpu_info.h",
         "ctstring.h",
@@ -1508,7 +1519,6 @@ filegroup(
     name = "tflite_portable_logging_hdrs",
     srcs = [
         "bfloat16.h",
-        "cus.h",
         "ctstring.h",
         "ctstring_internal.h",
         "logging.h",
@@ -1543,7 +1553,6 @@ filegroup(
     name = "gif_internal_hdrs",
     srcs = [
         "bfloat16.h",
-        "cus.h",
         "ctstring.h",
         "ctstring_internal.h",
         "dynamic_annotations.h",
@@ -1564,7 +1573,6 @@ filegroup(
         "abi.cc",
         "abi.h",
         "bfloat16.h",
-        "cus.h",
         "blocking_counter.h",
         "byte_order.h",
         "casts.h",

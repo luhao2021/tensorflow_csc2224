@@ -459,13 +459,7 @@ struct ProtoHelper<bfloat16> {
 
 template <>
 struct ProtoHelper<cus> {
-  static const cus* Begin(const TensorProto& proto) {
-    return reinterpret_cast<const cus*>(proto.cus_val().begin());
-  }
-  static size_t NumElements(const TensorProto& proto) {
-    return proto.cus_val().size();
-  }
-  static void Fill(const cus* data, size_t n, TensorProto* proto) {
+   static void Fill(const cus* data, size_t n, TensorProto* proto) {
     proto->mutable_cus_val()->Reserve(n);
     for (size_t i = 0; i < n; ++i) {
       proto->mutable_cus_val()->AddAlreadyReserved(data[i].value);
@@ -603,6 +597,30 @@ TensorBuffer* FromProtoField<Eigen::half>(Allocator* a, const TensorProto& in,
   } else if (in_n > 0) {
     std::copy_n(begin, in_n, data);
     const uint16 last = *(data + in_n - 1);
+    std::fill_n(data + in_n, n - in_n, last);
+  } else {
+    std::fill_n(data, n, 0);
+  }
+  return buf;
+}
+
+template <>
+TensorBuffer* FromProtoField<cus>(Allocator* a, const TensorProto& in,
+                                          int64 n) {
+  CHECK_GT(n, 0);
+  Buffer<cus>* buf = new Buffer<cus>(a, n);
+  uint32* data = buf->template base<uint32>();
+  if (data == nullptr) {
+    buf->Unref();
+    return nullptr;
+  }
+  const int64 in_n = in.float_val().size();
+  auto begin = in.float_val().begin();
+  if (n <= in_n) {
+    std::copy_n(begin, n, data);
+  } else if (in_n > 0) {
+    std::copy_n(begin, in_n, data);
+    const uint32 last = *(data + in_n - 1);
     std::fill_n(data + in_n, n - in_n, last);
   } else {
     std::fill_n(data, n, 0);
@@ -1035,6 +1053,10 @@ inline float PrintOneElement(const Eigen::half& h, bool print_v2) {
 
 inline float PrintOneElement(bfloat16 f, bool print_v2) {
   return static_cast<float>(f);
+}
+
+inline float PrintOneElement(cus c, bool print_v2) {
+  return static_cast<float>(c);
 }
 
 // Print from left dim to right dim recursively.

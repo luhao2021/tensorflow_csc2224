@@ -2795,19 +2795,20 @@ bool CUDABlas::DoBlasGemmStridedBatched(
     int64 stride_a, const DeviceMemory<cus>& b, int ldb, int64 stride_b,
     float beta, DeviceMemory<cus>* c, int ldc, int64 stride_c,
     int batch_count) {
-  // todo(chenhao) add batch part
   absl::MutexLock lock(&mu_);
   if (!SetStream(stream)) {
     return false;
   }
   gpu::ScopedActivateExecutorContext sac{parent_};
-  cudaError_t ret = cutlassCusGemm(
+  // todo(chenhao) is it necessary to pass stream as a parameter?
+  cudaError_t ret = cutlassCusStridedBatchedGemm(
       AsGpuStreamValue(stream), static_cast<bool>(transa),
       static_cast<bool>(transb), m, n, k, cus(alpha), GpuMemory(a), lda,
-      GpuMemory(b), ldb, cus(beta), GpuMemoryMutable(c), ldc);
+      stride_a, GpuMemory(b), ldb, stride_b, GpuMemoryMutable(c), ldc, stride_c,
+      cus(beta), batch_count);
 
   if (ret != cudaSuccess) {
-    LOG(ERROR) << "failed to run cutlass routine: ";
+    LOG(ERROR) << "failed to run cutlass strided batch gemm";
   }
   return ret == cudaSuccess;
 }

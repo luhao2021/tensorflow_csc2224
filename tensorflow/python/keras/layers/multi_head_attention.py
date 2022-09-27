@@ -327,6 +327,7 @@ class MultiHeadAttention(Layer):
                                          [self._num_heads, self._key_dim]),
           bias_axes=bias_axes if self._use_bias else None,
           name="query",
+          dtype=self.dtype_policy,
           **common_kwargs)
       einsum_equation, bias_axes, output_rank = _build_proj_equation(
           key_shape.rank - 1, bound_dims=1, output_dims=2)
@@ -336,6 +337,7 @@ class MultiHeadAttention(Layer):
                                          [self._num_heads, self._key_dim]),
           bias_axes=bias_axes if self._use_bias else None,
           name="key",
+          dtype=self.dtype_policy,
           **common_kwargs)
       einsum_equation, bias_axes, output_rank = _build_proj_equation(
           value_shape.rank - 1, bound_dims=1, output_dims=2)
@@ -345,6 +347,7 @@ class MultiHeadAttention(Layer):
                                          [self._num_heads, self._value_dim]),
           bias_axes=bias_axes if self._use_bias else None,
           name="value",
+          dtype=self.dtype_policy,
           **common_kwargs)
 
       # Builds the attention computations for multi-head dot product attention.
@@ -365,6 +368,7 @@ class MultiHeadAttention(Layer):
           output_shape=_get_output_shape(output_rank - 1, output_shape),
           bias_axes=bias_axes if self._use_bias else None,
           name="attention_output",
+          dtype=self.dtype_policy,
           **common_kwargs)
 
   def _build_attention(self, rank):
@@ -385,8 +389,8 @@ class MultiHeadAttention(Layer):
         _build_attention_equation(rank, attn_axes=self._attention_axes))
     norm_axes = tuple(
         range(attn_scores_rank - len(self._attention_axes), attn_scores_rank))
-    self._softmax = advanced_activations.Softmax(axis=norm_axes)
-    self._dropout_layer = core.Dropout(rate=self._dropout)
+    self._softmax = advanced_activations.Softmax(axis=norm_axes, dtype=self.dtype_policy)
+    self._dropout_layer = core.Dropout(rate=self._dropout, dtype=self.dtype_policy)
 
   def _masked_softmax(self, attention_scores, attention_mask=None):
     # Normalize the attention scores to probabilities.

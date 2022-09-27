@@ -180,6 +180,7 @@ class BatchNormalizationBase(Layer):
                virtual_batch_size=None,
                adjustment=None,
                name=None,
+               use_f32=None,
                **kwargs):
     super(BatchNormalizationBase, self).__init__(name=name, **kwargs)
     if isinstance(axis, (list, tuple)):
@@ -205,6 +206,7 @@ class BatchNormalizationBase(Layer):
     self.renorm = renorm
     self.virtual_batch_size = virtual_batch_size
     self.adjustment = adjustment
+    self.use_f32 = use_f32
     if self._USE_V2_BEHAVIOR:
       if fused:
         self._raise_if_fused_cannot_be_used()
@@ -282,7 +284,8 @@ class BatchNormalizationBase(Layer):
   @property
   def _param_dtype(self):
     # Raise parameters of fp16 batch norm to fp32
-    if self.dtype == dtypes.float16 or self.dtype == dtypes.bfloat16:
+    if self.dtype == dtypes.float16 or self.dtype == dtypes.bfloat16 or \
+      (self.use_f32 and self.dtype == dtypes.cus):
       return dtypes.float32
     else:
       return self.dtype or dtypes.float32
@@ -758,6 +761,8 @@ class BatchNormalizationBase(Layer):
       # In particular, it's very easy for variance to overflow in float16 and
       # for safety we also choose to cast bfloat16 to float32.
       inputs = math_ops.cast(inputs, dtypes.float32)
+    if inputs_dtype == dtypes.cus and self.use_f32:
+      inputs = math_ops.cast(inputs, dtypes.float32)
 
     # Compute the axes along which to reduce the mean / variance
     input_shape = inputs.shape
@@ -772,6 +777,8 @@ class BatchNormalizationBase(Layer):
     broadcast_shape[self.axis[0]] = input_shape.dims[self.axis[0]].value
 
     def _broadcast(v):
+      if inputs_dtype == 'cus' and not self.use_f32:
+        v = math_ops.cast(v, 'cus')
       if (v is not None and len(v.shape) != ndims and
           reduction_axes != list(range(ndims - 1))):
         return array_ops.reshape(v, broadcast_shape)
@@ -893,7 +900,9 @@ class BatchNormalizationBase(Layer):
                                      self.epsilon)
     if inputs_dtype in (dtypes.float16, dtypes.bfloat16):
       outputs = math_ops.cast(outputs, inputs_dtype)
-
+    if inputs_dtype == dtypes.cus and self.use_f32:
+      outputs = math_ops.cast(outputs, inputs_dtype)
+      
     # If some components of the shape got lost due to adjustments, fix that.
     outputs.set_shape(input_shape)
 
@@ -1125,6 +1134,7 @@ class LayerNormalization(Layer):
                gamma_constraint=None,
                trainable=True,
                name=None,
+               use_f32=False,
                **kwargs):
     super(LayerNormalization, self).__init__(
         name=name, trainable=trainable, **kwargs)
@@ -1145,7 +1155,7 @@ class LayerNormalization(Layer):
     self.gamma_regularizer = regularizers.get(gamma_regularizer)
     self.beta_constraint = constraints.get(beta_constraint)
     self.gamma_constraint = constraints.get(gamma_constraint)
-
+    self.use_f32 = use_f32
     self.supports_masking = True
 
     # Indicates whether a faster fused implementation can be used. This will be
@@ -1235,20 +1245,23 @@ class LayerNormalization(Layer):
       broadcast_shape[dim] = input_shape.dims[dim].value
 
     def _broadcast(v):
+      if inputs.dtype == 'cus' and not self.use_f32:
+        v = math_ops.cast(v, 'cus')
       if (v is not None and len(v.shape) != ndims and self.axis != [ndims - 1]):
         return array_ops.reshape(v, broadcast_shape)
       return v
 
     if not self._fused:
       input_dtype = inputs.dtype
-      if input_dtype in ('float16', 'bfloat16') and self.dtype == 'float32':
+      if (input_dtype in ('float16', 'bfloat16') or (input_dtype == 'cus' and self.use_f32)) \
+        and self.dtype == 'float32':
         # If mixed precision is used, cast inputs to float32 so that this is at
         # least as numerically stable as the fused version.
         inputs = math_ops.cast(inputs, 'float32')
 
       # Calculate the moments on the last axis (layer activations).
       mean, variance = nn.moments(inputs, self.axis, keep_dims=True)
-
+      
       scale, offset = _broadcast(self.gamma), _broadcast(self.beta)
 
       # Compute layer normalization using the batch_normalization function.

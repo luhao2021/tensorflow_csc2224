@@ -50,7 +50,7 @@ MAP_XLA_TYPE_TO_RECORD = {
     xla_data_pb2.CUS:
         TypeConversionRecord(
             primitive_type=xla_data_pb2.CUS,
-            numpy_dtype=dtypes.custom.as_numpy_dtype,
+            numpy_dtype=dtypes.cus.as_numpy_dtype,
             literal_field_name='cuss',
             literal_field_type=int),
     xla_data_pb2.F16:

@@ -368,7 +368,7 @@ REGISTER_OP("Rint")
 #define BINARY_FEWER()                                               \
   Input("x: T").Input("y: T").Output("z: T").Attr(                   \
       "T: {bfloat16, half, float, double, int32, int64, complex64, " \
-      "complex128}")
+      "complex128, cus}")
 
 REGISTER_OP("Add")
     .Input("x: T")

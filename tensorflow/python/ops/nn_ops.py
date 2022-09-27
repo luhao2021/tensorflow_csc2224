@@ -5170,8 +5170,12 @@ def dropout_v2(x, rate, noise_shape=None, seed=None, name=None):
     #
     # NOTE: Random uniform can only generate 2^23 floats on [1.0, 2.0)
     # and subtract 1.0.
-    random_tensor = random_ops.random_uniform(
-        noise_shape, seed=seed, dtype=x_dtype)
+    if is_rate_number:
+      random_tensor = random_ops.random_uniform(
+        noise_shape, seed=seed, dtype=float)
+    else:
+      random_tensor = random_ops.random_uniform(
+          noise_shape, seed=seed, dtype=x_dtype)
     # NOTE: if (1.0 + rate) - 1 is equal to rate, then that float is selected,
     # hence a >= comparison is used.
     keep_mask = random_tensor >= rate

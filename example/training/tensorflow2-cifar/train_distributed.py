@@ -181,13 +181,6 @@ class Model():
         # Restore the weights
         ckpt.restore(manager.latest_checkpoint)
 
-        # reader = tf.train.load_checkpoint(ckpt_path)
-        # map = reader.get_variable_to_shape_map()
-        # for key in map:
-        #   print("key")
-        #   print(key)
-        #   print(reader.get_tensor(key))
-
       for e in tqdm(range(int(curr_epoch), epoch)):
         # Reset the metrics at the start of the next epoch
         self.train_loss.reset_states()
@@ -197,20 +190,6 @@ class Model():
 
         total_loss = 0.0
         num_batches = 0
-
-        # for images, labels in test_ds:
-        #   # pred, loss = self.test_step(images, labels)
-        #   # print("test_pred", pred)
-        #   # print("test_loss", loss)
-        #   self.distributed_test_step(images, labels)
-        #   print("test_loss_first", self.test_loss.result())
-        #   print("test_acc_first", self.test_accuracy.result())
-        #   break
-
-        # self.train_loss.reset_states()
-        # self.train_accuracy.reset_states()
-        # self.test_loss.reset_states()
-        # self.test_accuracy.reset_states()
 
         for i, (images, labels) in enumerate(train_ds):
           # print(images.values[0].numpy().sum() +
@@ -223,11 +202,10 @@ class Model():
           it_loss = self.distributed_train_step(images, labels)
           total_loss += it_loss
           num_batches += 1
-          if i % 50 == 0:
-            print(it_loss)
-            # print("train_acc", train_acc)
-            print("train_loss", it_loss)
-          # break
+          # if i % 50 == 0:
+          #   print(it_loss)
+          #   print("train_acc", train_acc)
+          #   print("train_loss", it_loss)
 
         train_loss = total_loss / num_batches
 

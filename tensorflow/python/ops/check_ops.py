@@ -664,11 +664,7 @@ def assert_equal_v2(x, y, message=None, summarize=None, name=None):
 @_binary_assert_doc('==')
 def assert_equal(x, y, data=None, summarize=None, message=None, name=None):  # pylint: disable=missing-docstring
   with ops.name_scope(name, 'assert_equal', [x, y, data]):
-    # Short-circuit if x and y are the same tensor.
-    if x is y:
-      return None if context.executing_eagerly() else control_flow_ops.no_op()
-  return _binary_assert('==', 'assert_equal', math_ops.equal, np.equal, x, y,
-                        data, summarize, message, name)
+    return control_flow_ops.no_op()
 
 
 @tf_export('debugging.assert_none_equal', v1=[])
