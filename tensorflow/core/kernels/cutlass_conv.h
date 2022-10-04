@@ -16,22 +16,19 @@ cudaError_t cutlassCusConvForward(CUstream stream, MatrixCoord stride, Tensor4DC
                            MatrixCoord dilation, Tensor4DCoord input_size,
                            void* input_data, Tensor4DCoord filter_size,
                            void* filter_data, Tensor4DCoord output_size,
-                           void* output_data, float alpha, float beta,
-                           void *workSpace, size_t workSpaceSizeInBytes);
+                           void* output_data, float alpha, float beta);
 
 cudaError_t cutlassCusConvBackwardData(CUstream stream, MatrixCoord stride, Tensor4DCoord padding,
                            MatrixCoord dilation, Tensor4DCoord input_size,
                            void* input_data, Tensor4DCoord filter_size,
                            void* filter_data, Tensor4DCoord output_size,
-                           void* output_data, float alpha, float beta,
-                           void *workSpace, size_t workSpaceSizeInBytes);
+                           void* output_data, float alpha, float beta);
 
 cudaError_t cutlassCusConvBackwardFilter(CUstream stream, MatrixCoord stride, Tensor4DCoord padding,
                            MatrixCoord dilation, Tensor4DCoord input_size,
                            void* input_data, Tensor4DCoord filter_size,
                            void* filter_data, Tensor4DCoord output_size,
-                           void* output_data, float alpha, float beta,
-                           void *workSpace, size_t workSpaceSizeInBytes);
+                           void* output_data, float alpha, float beta);
 
 cudaError_t cutlassCusBiasActivationConv(
     CUstream stream, MatrixCoord stride, Tensor4DCoord padding, MatrixCoord dilation,

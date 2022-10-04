@@ -14,22 +14,22 @@
 #include "cutlass/util/tensor_view_io.h"
 #include "tensorflow/stream_executor/platform/logging.h"
 
+using ElementAccumulator = cus;
+
 cudaError_t cutlassCusConvForward(CUstream stream, MatrixCoord stride,
                                   Tensor4DCoord padding, MatrixCoord dilation,
                                   Tensor4DCoord input_size, void* input_data,
                                   Tensor4DCoord filter_size, void* filter_data,
                                   Tensor4DCoord output_size, void* output_data,
-                                  float alpha, float beta, void* workSpace,
-                                  size_t workSpaceSizeInBytes) {
+                                  float alpha, float beta) {
   using ElementA = cus;
   using ElementB = cus;
   using ElementC = cus;
-  using ElementAccumulator = float;
   using ElementCompute = cus;
   using SmArch = cutlass::arch::Sm75;
 
   using ThreadblockShape = cutlass::gemm::GemmShape<128, 128, 8>;
-  using WarpShape = cutlass::gemm::GemmShape<32, 32, 8>;
+  using WarpShape = cutlass::gemm::GemmShape<64, 64, 8>;
   using InstructionShape = cutlass::gemm::GemmShape<1, 1, 1>;
 
   using EpilogueOp = cutlass::epilogue::thread::LinearCombination<
@@ -83,11 +83,13 @@ cudaError_t cutlassCusConvForward(CUstream stream, MatrixCoord stride,
       tensor_c,     {static_cast<cus>(alpha), static_cast<cus>(beta)}};
 
   ImplicitGemm implicitGemmOp;
-  size_t workspace_size = implicitGemmOp.get_workspace_size(arguments);
+  size_t workspaceSize = implicitGemmOp.get_workspace_size(arguments);
+  cutlass::device_memory::allocation<uint8_t> workSpace(workspaceSize);
+
   cutlass::Status status = implicitGemmOp.can_implement(arguments);
   if (status != cutlass::Status::kSuccess)
     VLOG(3) << "operation not possible" << cutlassGetStatusString(status);
-  status = implicitGemmOp(arguments, workSpace, stream);
+  status = implicitGemmOp(arguments, workSpace.get(), stream);
   if (status != cutlass::Status::kSuccess) {
     return cudaErrorUnknown;
   }
@@ -98,12 +100,10 @@ cudaError_t cutlassCusConvBackwardData(
     CUstream stream, MatrixCoord stride, Tensor4DCoord padding,
     MatrixCoord dilation, Tensor4DCoord input_size, void* input_data,
     Tensor4DCoord filter_size, void* filter_data, Tensor4DCoord output_size,
-    void* output_data, float alpha, float beta, void* workSpace,
-    size_t workSpaceSizeInBytes) {
+    void* output_data, float alpha, float beta) {
   using ElementA = cus;
   using ElementB = cus;
   using ElementC = cus;
-  using ElementAccumulator = float;
   using ElementCompute = cus;
   using SmArch = cutlass::arch::Sm75;
 
@@ -163,12 +163,13 @@ cudaError_t cutlassCusConvBackwardData(
       tensor_x,     {static_cast<cus>(alpha), static_cast<cus>(beta)}};
 
   ImplicitGemm implicitGemmOp;
-  size_t workspace_size = implicitGemmOp.get_workspace_size(arguments);
+  size_t workspaceSize = implicitGemmOp.get_workspace_size(arguments);
+  cutlass::device_memory::allocation<uint8_t> workSpace(workspaceSize);
 
   cutlass::Status status = implicitGemmOp.can_implement(arguments);
   if (status != cutlass::Status::kSuccess)
     VLOG(3) << "operation not possible" << cutlassGetStatusString(status);
-  status = implicitGemmOp(arguments, workSpace, stream);
+  status = implicitGemmOp(arguments, workSpace.get(), stream);
   if (status != cutlass::Status::kSuccess) {
     return cudaErrorUnknown;
   }
@@ -179,12 +180,10 @@ cudaError_t cutlassCusConvBackwardFilter(
     CUstream stream, MatrixCoord stride, Tensor4DCoord padding,
     MatrixCoord dilation, Tensor4DCoord input_size, void* input_data,
     Tensor4DCoord filter_size, void* filter_data, Tensor4DCoord output_size,
-    void* output_data, float alpha, float beta, void* workSpace,
-    size_t workSpaceSizeInBytes) {
+    void* output_data, float alpha, float beta) {
   using ElementA = cus;
   using ElementB = cus;
   using ElementC = cus;
-  using ElementAccumulator = float;
   using ElementCompute = cus;
   using SmArch = cutlass::arch::Sm75;
 
@@ -248,13 +247,13 @@ cudaError_t cutlassCusConvBackwardFilter(
       tensor_w,     {static_cast<cus>(alpha), static_cast<cus>(beta)}};
 
   ImplicitGemm implicitGemmOp;
-  size_t workspace_size = implicitGemmOp.get_workspace_size(arguments);
-  //   cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
+  size_t workspaceSize = implicitGemmOp.get_workspace_size(arguments);
+  cutlass::device_memory::allocation<uint8_t> workSpace(workspaceSize);
 
   cutlass::Status status = implicitGemmOp.can_implement(arguments);
   if (status != cutlass::Status::kSuccess)
     VLOG(3) << "operation not possible" << cutlassGetStatusString(status);
-  status = implicitGemmOp(arguments, workSpace, stream);
+  status = implicitGemmOp(arguments, workSpace.get(), stream);
   if (status != cutlass::Status::kSuccess) {
     return cudaErrorUnknown;
   }

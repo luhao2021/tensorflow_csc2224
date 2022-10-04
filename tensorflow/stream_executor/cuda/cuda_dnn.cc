@@ -3018,7 +3018,6 @@ dnn::DataType GetConvAccumulatorType(dnn::DataType data_type) {
   switch (data_type) {
     case dnn::DataType::kFloat:
     case dnn::DataType::kDouble:
-    case dnn::DataType::kCus:
       return data_type;
     case dnn::DataType::kHalf:
       return CudnnEnvVar<ConvDoFP32ComputationFP16Input>::IsEnabled()
@@ -3096,7 +3095,7 @@ port::Status DoCutlassConvolve(
     DeviceMemoryBase input_data, const dnn::FilterDescriptor& filter_descriptor,
     DeviceMemoryBase filter_data, const dnn::BatchDescriptor& output_descriptor,
     DeviceMemoryBase output_data,
-    const dnn::ConvolutionDescriptor& convolution_descriptor, DeviceMemory<uint8> scratch_memory) {
+    const dnn::ConvolutionDescriptor& convolution_descriptor) {
   float falpha = 1.0;
   void* alpha = static_cast<void*>(&falpha);
   // Beta is the scaling factor for output.
@@ -3115,8 +3114,7 @@ port::Status DoCutlassConvolve(
           CreateTensor4DCoord(input_descriptor), input_data.opaque(),
           CreateTensor4DCoord(filter_descriptor), filter_data.opaque(),
           CreateTensor4DCoord(output_descriptor), output_data.opaque(), falpha,
-          fbeta, /*workSpace=*/scratch_memory.opaque(),
-          /*workSpaceSizeInBytes=*/scratch_memory.size());
+          fbeta);
       break;
     case dnn::ConvolutionKind::BACKWARD_DATA:
       VLOG(3) << "doing cutlass convolution backward_data for cus";
@@ -3127,8 +3125,7 @@ port::Status DoCutlassConvolve(
           CreateTensor4DCoord(input_descriptor), input_data.opaque(),
           CreateTensor4DCoord(filter_descriptor), filter_data.opaque(),
           CreateTensor4DCoord(output_descriptor), output_data.opaque(), falpha,
-          fbeta, /*workSpace=*/scratch_memory.opaque(),
-          /*workSpaceSizeInBytes=*/scratch_memory.size());
+          fbeta);
       break;
     case dnn::ConvolutionKind::BACKWARD_FILTER:
       VLOG(3) << "doing cutlass convolution backward_filter for cus";
@@ -3139,8 +3136,7 @@ port::Status DoCutlassConvolve(
           CreateTensor4DCoord(input_descriptor), input_data.opaque(),
           CreateTensor4DCoord(filter_descriptor), filter_data.opaque(),
           CreateTensor4DCoord(output_descriptor), output_data.opaque(), falpha,
-          fbeta, /*workSpace=*/scratch_memory.opaque(),
-          /*workSpaceSizeInBytes=*/scratch_memory.size());
+          fbeta);
       break;
     default:
       return port::InternalError(
@@ -3168,7 +3164,7 @@ port::Status CudnnSupport::DoConvolve(
   if (element_type == dnn::DataType::kCus) {
     return DoCutlassConvolve(stream, kind, input_descriptor, input_data, filter_descriptor,
                       filter_data, output_descriptor, output_data,
-                      convolution_descriptor, scratch_memory);
+                      convolution_descriptor);
   }
 
   cudnnDataType_t cudnn_type = ToCudnnDataType(element_type);
