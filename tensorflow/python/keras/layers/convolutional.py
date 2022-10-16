@@ -43,6 +43,7 @@ from tensorflow.python.keras.layers.pooling import MaxPooling3D
 from tensorflow.python.keras.utils import conv_utils
 from tensorflow.python.keras.utils import tf_utils
 from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.util.tf_export import keras_export
@@ -130,6 +131,8 @@ class Conv(Layer):
                trainable=True,
                name=None,
                conv_op=None,
+               sp_mask=None,
+               sp_inplace=True,
                **kwargs):
     super(Conv, self).__init__(
         trainable=trainable,
@@ -166,6 +169,10 @@ class Conv(Layer):
     self._channels_first = self.data_format == 'channels_first'
     self._tf_data_format = conv_utils.convert_data_format(
         self.data_format, self.rank + 2)
+
+    self.sp_mask = sp_mask
+    self.sp_inplace = sp_inplace
+
 
   def _validate_init(self):
     if self.filters is not None and self.filters % self.groups != 0:
@@ -245,7 +252,18 @@ class Conv(Layer):
     if self._is_causal:  # Apply causal padding to inputs for Conv1D.
       inputs = array_ops.pad(inputs, self._compute_causal_padding(inputs))
 
-    outputs = self._convolution_op(inputs, self.kernel)
+    if self.sp_mask is not None:
+      masked_kernel = math_ops.multiply(self.kernel, self.sp_mask)
+
+      if self.sp_inplace:
+        for v in self.trainable_variables:
+          if 'kernel' in v.name:
+            v.assign(masked_kernel)
+
+      outputs = self._convolution_op(inputs, masked_kernel)
+
+    else:
+      outputs = self._convolution_op(inputs, self.kernel)
 
     if self.use_bias:
       output_rank = outputs.shape.rank

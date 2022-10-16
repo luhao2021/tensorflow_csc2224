@@ -50,10 +50,12 @@ from tensorflow.python.keras.utils import generic_utils
 from tensorflow.python.keras.utils import tf_inspect
 from tensorflow.python.keras.utils import tf_utils
 from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import sort_ops
 from tensorflow.python.ops import gen_array_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn
 from tensorflow.python.ops import variable_scope
+from tensorflow.python.ops import sparse_ops
 from tensorflow.python.ops.ragged import ragged_tensor
 from tensorflow.python.platform import tf_logging
 from tensorflow.python.training.tracking import base as trackable
@@ -1153,6 +1155,9 @@ class Dense(Layer):
                activity_regularizer=None,
                kernel_constraint=None,
                bias_constraint=None,
+               sp_mask=None,
+               sp_ratio=None,
+               sp_inplace=True,
                **kwargs):
     super(Dense, self).__init__(
         activity_regularizer=activity_regularizer, **kwargs)
@@ -1169,6 +1174,9 @@ class Dense(Layer):
 
     self.input_spec = InputSpec(min_ndim=2)
     self.supports_masking = True
+    self.sp_mask = sp_mask
+    self.sp_ratio = sp_ratio
+    self.sp_inplace = sp_inplace
 
   def build(self, input_shape):
     dtype = dtypes.as_dtype(self.dtype or K.floatx())
@@ -1204,6 +1212,51 @@ class Dense(Layer):
     self.built = True
 
   def call(self, inputs):
+    if self.sp_mask is not None:
+        masked_kernel = math_ops.multiply(self.kernel, self.sp_mask)
+
+        if self.sp_inplace:
+          for v in self.trainable_variables:
+            if 'kernel' in v.name:
+              v.assign(masked_kernel)
+
+        return core_ops.dense(
+            inputs,
+            masked_kernel,
+            self.bias,
+            self.activation,
+            dtype=self._compute_dtype_object)
+
+    elif self.sp_ratio is not None:
+        N,M = self.sp_ratio
+        if N >= M:
+            raise ValueError("Error: %d must be less than %d" % (N,M))
+
+        weight_ = array_ops.reshape(self.kernel, [-1,M])
+        mask_index = sort_ops.argsort(weight_, axis=1)[:, :int(M-N)]
+        indice_x = array_ops.reshape(array_ops.repeat(np.arange(mask_index.shape[0], dtype=np.int32), int(M-N)), [-1,2])
+        indices = array_ops.reshape(array_ops.stack([indice_x, mask_index], axis=-1), [-1, 2])
+
+        weight_mask = array_ops.ones(weight_.shape, dtype=dtypes.int32)
+        weight_mask = array_ops.tensor_scatter_nd_update(weight_mask, indices, array_ops.zeros(indices.shape[0], dtype=dtypes.int32))
+
+        sp_mask = array_ops.reshape(weight_mask, self.kernel.shape)
+        sp_mask = math_ops.cast(sp_mask, dtype=dtypes.float32)
+
+        masked_kernel = math_ops.multiply(self.kernel, sp_mask)
+
+        if self.sp_inplace:
+          for v in self.trainable_variables:
+            if 'kernel' in v.name:
+              v.assign(masked_kernel)
+
+        return core_ops.dense(
+            inputs,
+            masked_kernel,
+            self.bias,
+            self.activation,
+            dtype=self._compute_dtype_object)
+
     return core_ops.dense(
         inputs,
         self.kernel,
