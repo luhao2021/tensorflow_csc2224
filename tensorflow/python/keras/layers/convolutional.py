@@ -24,6 +24,7 @@ import six
 
 from tensorflow.python.eager import context
 from tensorflow.python.framework import tensor_shape
+from tensorflow.python.framework import dtypes
 from tensorflow.python.keras import activations
 from tensorflow.python.keras import backend
 from tensorflow.python.keras import constraints
@@ -43,6 +44,7 @@ from tensorflow.python.keras.layers.pooling import MaxPooling3D
 from tensorflow.python.keras.utils import conv_utils
 from tensorflow.python.keras.utils import tf_utils
 from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import sort_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn
 from tensorflow.python.ops import nn_ops
@@ -132,6 +134,7 @@ class Conv(Layer):
                name=None,
                conv_op=None,
                sp_mask=None,
+               sp_ratio=None,
                sp_inplace=True,
                **kwargs):
     super(Conv, self).__init__(
@@ -171,6 +174,7 @@ class Conv(Layer):
         self.data_format, self.rank + 2)
 
     self.sp_mask = sp_mask
+    self.sp_ratio = sp_ratio
     self.sp_inplace = sp_inplace
 
 
@@ -253,17 +257,51 @@ class Conv(Layer):
       inputs = array_ops.pad(inputs, self._compute_causal_padding(inputs))
 
     if self.sp_mask is not None:
-      masked_kernel = math_ops.multiply(self.kernel, self.sp_mask)
+        #print("-----------------SPMASK_CALL------------------")
+        #print(self.sp_mask)
+        masked_kernel = math_ops.multiply(self.kernel, self.sp_mask)
 
-      if self.sp_inplace:
-        for v in self.trainable_variables:
-          if 'kernel' in v.name:
-            v.assign(masked_kernel)
+        if self.sp_inplace:
+            for v in self.trainable_variables:
+                if 'kernel' in v.name:
+                    v.assign(masked_kernel)
 
-      outputs = self._convolution_op(inputs, masked_kernel)
+        outputs = self._convolution_op(inputs, masked_kernel)
+
+    elif self.sp_ratio is not None:
+        N,M = self.sp_ratio
+        #print("-----------------RATIO_CALL------------------")
+        #print("Using ratio:", N, M, "weight shape:", self.kernel.shape)
+        if N >= M:
+            raise ValueError("Error: %d must be less than %d" % (N,M))
+
+        weight_ = array_ops.reshape(self.kernel, [-1,M])
+        mask_index = sort_ops.argsort(weight_, axis=1)[:, :int(M-N)]
+        #print("mask_index:", mask_index.shape, mask_index)
+        indice_x = array_ops.reshape(array_ops.repeat(math_ops.range(mask_index.shape[0], dtype=dtypes.int32), int(M-N)), [-1,2])
+        #print("idx_x:", indice_x.shape, indice_x)
+        indices = array_ops.reshape(array_ops.stack([indice_x, mask_index], axis=-1), [-1, 2])
+        #print("indices:", indices.shape, indices)
+
+        weight_mask = array_ops.ones(weight_.shape, dtype=dtypes.int32)
+        #print("weight_mask:", weight_mask.shape, weight_mask)
+        weight_mask = array_ops.tensor_scatter_nd_update(weight_mask, indices, array_ops.zeros(indices.shape[0], dtype=dtypes.int32))
+        #print("weight_mask:", weight_mask.shape, weight_mask)
+
+        sp_mask = array_ops.reshape(weight_mask, self.kernel.shape)
+        sp_mask = math_ops.cast(sp_mask, dtype=dtypes.float32)
+
+        masked_kernel = math_ops.multiply(self.kernel, sp_mask)
+
+        if self.sp_inplace:
+            for v in self.trainable_variables:
+                if 'kernel' in v.name:
+                    v.assign(masked_kernel)
+
+        outputs = self._convolution_op(inputs, masked_kernel)
 
     else:
-      outputs = self._convolution_op(inputs, self.kernel)
+        outputs = self._convolution_op(inputs, self.kernel)
 
     if self.use_bias:
       output_rank = outputs.shape.rank
