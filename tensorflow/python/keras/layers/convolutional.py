@@ -278,7 +278,7 @@ class Conv(Layer):
         weight_ = array_ops.reshape(self.kernel, [-1,M])
         mask_index = sort_ops.argsort(weight_, axis=1)[:, :int(M-N)]
         #print("mask_index:", mask_index.shape, mask_index)
-        indice_x = array_ops.reshape(array_ops.repeat(math_ops.range(mask_index.shape[0], dtype=dtypes.int32), int(M-N)), [-1,2])
+        indice_x = array_ops.reshape(array_ops.repeat(math_ops.range(mask_index.shape[0], dtype=dtypes.int32), int(M-N)), [-1,int(M-N)])
         #print("idx_x:", indice_x.shape, indice_x)
         indices = array_ops.reshape(array_ops.stack([indice_x, mask_index], axis=-1), [-1, 2])
         #print("indices:", indices.shape, indices)

@@ -1234,7 +1234,7 @@ class Dense(Layer):
 
         weight_ = array_ops.reshape(self.kernel, [-1,M])
         mask_index = sort_ops.argsort(weight_, axis=1)[:, :int(M-N)]
-        indice_x = array_ops.reshape(array_ops.repeat(np.arange(mask_index.shape[0], dtype=np.int32), int(M-N)), [-1,2])
+        indice_x = array_ops.reshape(array_ops.repeat(np.arange(mask_index.shape[0], dtype=np.int32), int(M-N)), [-1,int(M-N)])
         indices = array_ops.reshape(array_ops.stack([indice_x, mask_index], axis=-1), [-1, 2])
 
         weight_mask = array_ops.ones(weight_.shape, dtype=dtypes.int32)
