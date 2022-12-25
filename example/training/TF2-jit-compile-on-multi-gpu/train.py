@@ -3,10 +3,11 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras import layers
 tf.debugging.set_log_device_placement(False)
 
 from dataloader import ILSVRC, CIFAR
-import op_utils, utils
+import op_utils, utils, nets
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument("--train_path", default="test", type=str, help = 'path to log')
@@ -25,6 +26,10 @@ parser.add_argument("--train_epoch", default=100, type=int, help = 'total traini
 parser.add_argument("--gpu_id", default= [0], type=int, nargs = '+', help = 'denote which gpus are used')
 parser.add_argument("--do_log", default=200, type=int, help = 'logging period')
 parser.add_argument("--compile", default=False, action = 'store_true', help = 'denote use compile or not. True is recommended in this repo')
+parser.add_argument('--spratio', type=int, nargs='+', default=None, help='sparse ratio')
+parser.add_argument('--spgrad', type=int, nargs='+', default=None, help='sparse ratio for gradient')
+parser.add_argument('--spg_epoch', type=int, default=0, help='epoch to start sparsify')
+parser.add_argument("--ckpt_name", default="ckpt0", type=str, help = 'checkpoint file name')
 args = parser.parse_args()
 
 # run deterministically
@@ -39,6 +44,30 @@ if args.dataset == 'ILSVRC':
     args.weight_decay /= len(args.gpu_id)
     args.learning_rate *= args.batch_size/256
 
+def compute_sparse_kernel(weights, N, M):
+    weights_ = tf.reshape(weights, [-1, int(M)])
+    mask_index = tf.argsort(tf.abs(weights_), axis=1)[:, :int(M-N)]
+    indice_x = tf.reshape(tf.repeat(tf.range(mask_index.shape[0], dtype=tf.int32), int(M-N)), [-1,int(M-N)])
+    indices = tf.reshape(tf.stack([indice_x, mask_index], axis=-1), [-1, 2])
+
+    weight_mask = tf.ones(weights_.shape, dtype=tf.int32)
+    weight_mask = tf.tensor_scatter_nd_update(weight_mask, indices, tf.zeros(indices.shape[0], dtype=tf.int32))
+
+    sp_mask = tf.reshape(weight_mask, tf.shape(weights))
+    sp_mask = tf.cast(sp_mask, dtype=tf.float32)
+    sparse_kernel = tf.multiply(weights, sp_mask)
+
+    return sparse_kernel
+
+def sparsify(model, N, M):
+    for i, layer in enumerate(model.layers):
+        #print(i, type(layer))
+        if type(layer) == nets.tcl.Conv2d or type(layer) == nets.tcl.FC:
+            #print("layer:", i, type(layer), len(weights), tf.shape(weights[0]), tf.shape(weights[1]))
+            weights = layer.get_weights()
+            sparse_kernel = compute_sparse_kernel(weights[0], N, M)
+            layer.set_weights([sparse_kernel, weights[1]])
+
 if __name__ == '__main__':
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.set_visible_devices([tf.config.list_physical_devices('GPU')[i] for i in args.gpu_id], 'GPU')
@@ -46,6 +75,12 @@ if __name__ == '__main__':
         tf.config.experimental.set_memory_growth(gpus[gpu_id], True)
     devices = ['/gpu:{}'.format(i) for i in args.gpu_id]
     strategy = tf.distribute.MirroredStrategy(devices, cross_device_ops=tf.distribute.HierarchicalCopyAllReduce())
+
+    if args.spratio is not None:
+        N, M = args.spratio
+        N = int(N)
+        M = int(M)
+        print("sparsity: (%d,%d)" % (N,M))
 
     with strategy.scope():
         if args.dataset == 'ILSVRC':
@@ -64,13 +99,30 @@ if __name__ == '__main__':
             loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction = tf.keras.losses.Reduction.SUM)
             Eval = utils.Evaluation(args, model, strategy, datasets['test'], loss_object)
 
+            best_acc = tf.Variable(0.0)
+            curr_epoch = tf.Variable(0)
+            ckpt_path = './checkpoints/' + args.ckpt_name
+            ckpt = tf.train.Checkpoint(curr_epoch=curr_epoch, best_acc=best_acc, optimizer=optimizer, model=model)
+            manager = tf.train.CheckpointManager(ckpt, ckpt_path, max_to_keep=1)
+
+
             print ('Training starts')
             fine_tuning_time = 0
             tic = time.time()
             for step, data in enumerate(datasets['train']):
                 epoch = step//datasets['train_len']
                 lr = utils.scheduler(args, optimizer, epoch)
-                train_step(*data)
+                train_step(epoch, *data)
+
+                '''
+                if args.spratio is not None:
+                    sparsify(model, N, M)
+                '''
+
+                if args.spgrad is not None or args.spratio is not None:
+                    print("step:%d, print the first 64 element of weight:" % (step))
+                    #print(model.layers)
+                    print(model.layers[4].get_weights()[0][0,0,0,:])
 
                 step += 1
                 # if 1:
@@ -82,6 +134,7 @@ if __name__ == '__main__':
                     tic = time.time()
 
                 if step % datasets['train_len'] == 0:
+
                     tic_ = time.time()
                     test_acc, test_loss = Eval.run(False)
 
@@ -100,4 +153,31 @@ if __name__ == '__main__':
                     train_accuracy.reset_states()
                     tic += time.time() - tic_
 
-        utils.save_model(args, model, 'trained_params')
+                    # Save checkpoint
+                    if test_acc > best_acc:
+                        print('Achieve Best, Saving...')
+                        best_acc.assign(test_acc)
+                        curr_epoch.assign(epoch + 1)
+                        if not os.path.isdir('./checkpoints/'):
+                            os.mkdir('./checkpoints/')
+                        if not os.path.isdir(ckpt_path):
+                            os.mkdir(ckpt_path)
+
+                        manager.save()
+
+                        ckpt.restore(manager.latest_checkpoint)
+
+                        Eval = utils.Evaluation(args, model, strategy, datasets['test'], loss_object)
+                        test_acc, test_loss = Eval.run(False)
+                        print ('Prediction Accuracy: {:.2f}%'.format(test_acc*100))
+
+        # Restore the weights
+        ckpt.restore(manager.latest_checkpoint)
+
+        # Prediction
+        Eval = utils.Evaluation(args, model, strategy, datasets['test'], loss_object)
+        test_acc, test_loss = Eval.run(False)
+        if args.spratio is not None:
+            print("print the first 64 element of loaded weight:")
+            print(model.layers[2].get_weights()[0][0,0,0,:])
+        print ('Prediction Accuracy: {:.2f}%'.format(test_acc*100))
